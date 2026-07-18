@@ -6,7 +6,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.graphics.Color
+import com.kyant.backdrop.Backdrop
+import com.piliplus.recodeing.core.design.LiquidButton
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Search
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -39,6 +47,7 @@ private val HomeContentMaxWidth = 680.dp
 
 @Composable
 fun HomeScreen(
+    backdrop: Backdrop,
     viewModel: HomeViewModel = viewModel { HomeViewModel() },
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -63,13 +72,30 @@ fun HomeScreen(
                 .padding(horizontal = 16.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            SearchBar(
+            LiquidButton(
+                onClick = { searchExpanded = true },
+                backdrop = backdrop,
+                modifier = Modifier.fillMaxWidth(),
+                tint = MiuixTheme.colorScheme.primary.copy(alpha = 0.12f),
+            ) {
+                Icon(
+                    imageVector = MiuixIcons.Light.Search,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                )
+                Text(
+                    text = state.searchQuery.ifBlank { state.searchDefault.ifBlank { "搜索视频、UP 主与番剧" } },
+                    modifier = Modifier.weight(1f),
+                    color = Color.Unspecified,
+                )
+            }
+
+            if (searchExpanded) SearchBar(
                 inputField = {
                     InputField(
                         query = state.searchQuery,
                         onQueryChange = viewModel::updateSearchQuery,
                         onSearch = {
-                            searchExpanded = false
                             viewModel.submitSearch(it)
                         },
                         expanded = searchExpanded,

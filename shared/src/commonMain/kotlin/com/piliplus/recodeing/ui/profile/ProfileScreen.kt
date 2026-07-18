@@ -18,18 +18,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.piliplus.recodeing.core.auth.AccountRepository
 import com.piliplus.recodeing.core.auth.AuthState
+import com.kyant.backdrop.Backdrop
 import com.piliplus.recodeing.core.auth.rememberUrlOpener
-import top.yukonga.miuix.kmp.basic.Button
-import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import com.piliplus.recodeing.core.design.LiquidButton
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 fun ProfileScreen(
     accountRepository: AccountRepository,
+    backdrop: Backdrop,
 ) {
     val urlOpener = rememberUrlOpener()
     val authState by accountRepository.authState.collectAsState()
@@ -68,16 +68,19 @@ fun ProfileScreen(
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
-                                Button(
+                                LiquidButton(
                                     onClick = { urlOpener.open(accountRepository.officialLoginUrl) },
-                                    colors = ButtonDefaults.buttonColorsPrimary(),
+                                    backdrop = backdrop,
+                                    tint = MiuixTheme.colorScheme.primary.copy(alpha = 0.18f),
                                 ) {
-                                    Text("官方登录")
+                                    Text("登录账号")
                                 }
-                                TextButton(
-                                    text = "注册或验证",
+                                LiquidButton(
                                     onClick = { urlOpener.open(accountRepository.officialRegisterUrl) },
-                                )
+                                    backdrop = backdrop,
+                                ) {
+                                    Text("注册或验证")
+                                }
                             }
                         }
                         is AuthState.LoggedIn -> {
@@ -87,11 +90,13 @@ fun ProfileScreen(
                                 modifier = Modifier.padding(top = 8.dp),
                                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                             )
-                            TextButton(
-                                text = "退出当前账号",
+                            LiquidButton(
                                 onClick = accountRepository::clearSession,
+                                backdrop = backdrop,
                                 modifier = Modifier.padding(top = 16.dp),
-                            )
+                            ) {
+                                Text("退出当前账号")
+                            }
                         }
                     }
                 }

@@ -74,4 +74,5 @@ object PiliGlassDefaults {
     val RefractionHeight = 16.dp
     val RefractionAmount = 32.dp
     const val SurfaceAlpha = 0.46f
+    const val LuminanceSampleIntervalMillis = 750L
 }

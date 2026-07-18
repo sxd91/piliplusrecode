@@ -40,7 +40,7 @@ fun createBiliHttpClient(): HttpClient = HttpClient(platformHttpClientEngine()) 
         socketTimeoutMillis = 30_000
     }
     install(UserAgent) {
-        agent = "Mozilla/5.0 PiliPlusRecodeing/0.1 ComposeMultiplatform"
+        agent = "Mozilla/5.0 liquidreode/0.1 ComposeMultiplatform"
     }
     install(Logging) {
         level = LogLevel.INFO

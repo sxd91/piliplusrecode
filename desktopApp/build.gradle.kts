@@ -25,11 +25,12 @@ compose.desktop {
         mainClass = "com.piliplus.recodeing.MainKt"
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "PiliPlusRecodeing"
+            packageName = "liquidreode"
             packageVersion = "0.1.0"
+            vendor = "SXD"
             modules("java.desktop", "java.logging", "java.naming", "java.net.http", "java.prefs", "java.sql")
             windows {
-                menuGroup = "PiliPlus Recodeing"
+                menuGroup = "liquidreode"
                 upgradeUuid = "B8B21B6A-0AD8-44A7-9016-A9256ED02652"
             }
         }

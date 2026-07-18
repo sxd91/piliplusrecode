@@ -20,7 +20,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "PiliPlusRecodeing"
+rootProject.name = "liquidreode"
 
 include(":shared")
 include(":androidApp")

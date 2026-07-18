@@ -4,9 +4,12 @@ import com.piliplus.recodeing.core.model.BiliResponse
 import com.piliplus.recodeing.core.model.NavUserInfo
 import com.piliplus.recodeing.core.model.PopularFeedData
 import com.piliplus.recodeing.core.model.RecommendFeedData
+import com.piliplus.recodeing.core.model.RecommendItem
 import com.piliplus.recodeing.core.model.SearchAllData
 import com.piliplus.recodeing.core.model.SearchDefaultData
 import com.piliplus.recodeing.core.model.SearchSuggestEnvelope
+import com.piliplus.recodeing.core.model.VideoDetail
+import com.piliplus.recodeing.core.model.VideoPlayUrl
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
@@ -14,7 +17,7 @@ import io.ktor.client.request.parameter
 
 class BiliApiService(
     private val client: HttpClient = createBiliHttpClient(),
-    private val wbiSigner: WbiSigner = WbiSigner(),
+    private val wbiSigner: WbiSigner = WbiSigner(client),
 ) {
     suspend fun recommendations(pageSize: Int, freshIndex: Int): BiliResponse<RecommendFeedData> {
         val params = wbiSigner.sign(
@@ -70,6 +73,41 @@ class BiliApiService(
             parameter("term", term)
             parameter("main_ver", "v1")
             parameter("highlight", term)
+        }.body()
+    }
+
+    suspend fun videoDetail(bvid: String): BiliResponse<VideoDetail> {
+        return client.get(BiliApiConstants.VIDEO_VIEW) {
+            parameter("bvid", bvid)
+        }.body()
+    }
+
+    suspend fun relatedVideos(bvid: String): BiliResponse<List<RecommendItem>> {
+        return client.get(BiliApiConstants.VIDEO_RELATED) {
+            parameter("bvid", bvid)
+        }.body()
+    }
+
+    suspend fun videoPlayUrl(
+        bvid: String,
+        cid: Long,
+        quality: Int = 80,
+        tryLook: Boolean = true,
+    ): BiliResponse<VideoPlayUrl> {
+        val params = wbiSigner.sign(
+            mapOf(
+                "bvid" to bvid,
+                "cid" to cid,
+                "qn" to quality,
+                "fnval" to 4048,
+                "fnver" to 0,
+                "fourk" to 1,
+                "try_look" to if (tryLook) 1 else null,
+                "web_location" to 1315873,
+            ),
+        )
+        return client.get(BiliApiConstants.VIDEO_PLAY_URL) {
+            params.forEach { (key, value) -> parameter(key, value) }
         }.body()
     }
 }

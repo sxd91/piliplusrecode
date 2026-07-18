@@ -4,7 +4,7 @@
 
     <application
         android:allowBackup="false"
-        android:label="PiliPlus Recodeing"
+        android:label="liquidreode"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
         <activity

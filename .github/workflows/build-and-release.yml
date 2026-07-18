@@ -207,7 +207,7 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
           {
-            echo "# PiliPlus Recodeing ${VERSION}"
+            echo "# liquidreode ${VERSION}"
             echo
             echo "Unsigned Android and Linux/Windows desktop build artifacts. Apple targets are not published."
             echo

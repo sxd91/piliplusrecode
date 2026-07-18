@@ -20,16 +20,6 @@ kotlin {
     }
 
     jvm("desktop")
-    listOf(
-        iosArm64(),
-        iosSimulatorArm64(),
-    ).forEach { target ->
-        target.binaries.framework {
-            baseName = "shared"
-            isStatic = true
-        }
-    }
-    macosArm64()
 
     sourceSets {
         commonMain.dependencies {
@@ -55,29 +45,8 @@ kotlin {
             implementation(libs.ktor.client.okhttp)
         }
 
-        val skikoMain by creating {
-            dependsOn(commonMain.get())
+        getByName("desktopMain").dependencies {
+            implementation(libs.ktor.client.cio)
         }
-        getByName("desktopMain").apply {
-            dependsOn(skikoMain)
-            dependencies {
-                implementation(libs.ktor.client.cio)
-            }
-        }
-        macosArm64Main.get().apply {
-            dependsOn(skikoMain)
-            dependencies {
-                implementation(libs.ktor.client.darwin)
-            }
-        }
-
-        val iosMain by creating {
-            dependsOn(skikoMain)
-            dependencies {
-                implementation(libs.ktor.client.darwin)
-            }
-        }
-        iosArm64Main.get().dependsOn(iosMain)
-        iosSimulatorArm64Main.get().dependsOn(iosMain)
     }
 }

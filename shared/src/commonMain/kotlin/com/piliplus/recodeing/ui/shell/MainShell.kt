@@ -17,6 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
@@ -42,7 +43,11 @@ import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-private val WideNavigationWidth = 760.dp
+private val CompactWidth = 600.dp
+private val ExpandedWidth = 840.dp
+private val MediumLandscapeMinHeight = 520.dp
+
+private enum class WindowNavigationMode { CompactBottomBar, SideRail }
 
 @Composable
 fun MainShell(
@@ -51,50 +56,123 @@ fun MainShell(
     var current by remember { mutableStateOf<AppDestination>(AppDestination.Home) }
     val settingsRepository = rememberSettingsRepository()
     val settingsStateHolder = remember(settingsRepository) { SettingsStateHolder(settingsRepository) }
-    val backgroundColor = MiuixTheme.colorScheme.background
-    val glassNavigationColor = MiuixTheme.colorScheme.surface.copy(alpha = PiliGlassDefaults.SurfaceAlpha)
-    val backdrop = rememberLayerBackdrop(
-        onDraw = {
-            drawRect(backgroundColor)
-            drawContent()
-        },
-    )
-    val scrollBehavior = key(current) { MiuixScrollBehavior() }
 
-    BoxWithConstraints(
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val settings = settingsStateHolder.state
+        val navigationMode = remember(maxWidth, maxHeight, settings.useNavigationRail, settings.tabletNavigationOptimization) {
+            resolveNavigationMode(
+                width = maxWidth,
+                height = maxHeight,
+                preferRail = settings.useNavigationRail,
+                optimizeTabletNavigation = settings.tabletNavigationOptimization,
+            )
+        }
+        ShellWithBackdrop(
+            navigationMode = navigationMode,
+            current = current,
+            onDestinationSelected = { current = it },
+            accountRepository = accountRepository,
+            settingsStateHolder = settingsStateHolder,
+            glassEnabled = settings.glassEnabled,
+            floatingBottomBar = settings.floatingBottomBar,
+        )
+    }
+}
+
+private fun resolveNavigationMode(
+    width: Dp,
+    height: Dp,
+    preferRail: Boolean,
+    optimizeTabletNavigation: Boolean,
+): WindowNavigationMode = when {
+    width < CompactWidth -> WindowNavigationMode.CompactBottomBar
+    preferRail -> WindowNavigationMode.SideRail
+    optimizeTabletNavigation && width >= ExpandedWidth -> WindowNavigationMode.SideRail
+    optimizeTabletNavigation && width > height && height >= MediumLandscapeMinHeight -> WindowNavigationMode.SideRail
+    else -> WindowNavigationMode.CompactBottomBar
+}
+
+@Composable
+private fun ShellWithBackdrop(
+    navigationMode: WindowNavigationMode,
+    current: AppDestination,
+    onDestinationSelected: (AppDestination) -> Unit,
+    accountRepository: AccountRepository,
+    settingsStateHolder: SettingsStateHolder,
+    glassEnabled: Boolean,
+    floatingBottomBar: Boolean,
+) {
+    val backgroundColor = MiuixTheme.colorScheme.background
+    val backdrop = key(navigationMode) {
+        rememberLayerBackdrop(
+            onDraw = {
+                drawRect(backgroundColor)
+                drawContent()
+            },
+        )
+    }
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(backgroundColor)
             .layerBackdrop(backdrop),
     ) {
-        val useRail = maxWidth >= WideNavigationWidth
+        when (navigationMode) {
+            WindowNavigationMode.CompactBottomBar -> CompactShell(
+                current = current,
+                onDestinationSelected = onDestinationSelected,
+                accountRepository = accountRepository,
+                settingsStateHolder = settingsStateHolder,
+                backdrop = backdrop,
+                glassEnabled = glassEnabled,
+                floatingBottomBar = floatingBottomBar,
+            )
 
-        Scaffold(
-            modifier = Modifier
-                .fillMaxSize()
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
-            topBar = {
-                TopAppBar(
-                    title = current.title,
-                    largeTitle = when (current) {
-                        AppDestination.Home -> "PiliPlus"
-                        AppDestination.Dynamics -> "动态"
-                        AppDestination.Profile -> "个人中心"
-                        AppDestination.Settings -> "设置"
-                    },
-                    scrollBehavior = scrollBehavior,
-                )
-            },
-            bottomBar = {
-                if (!useRail) {
-                    GlassBottomNavigation(
-                        selected = current,
-                        onSelected = { current = it },
-                        modifier = Modifier
-                            .padding(horizontal = 16.dp)
-                            .drawBackdrop(
+            WindowNavigationMode.SideRail -> RailShell(
+                current = current,
+                onDestinationSelected = onDestinationSelected,
+                accountRepository = accountRepository,
+                settingsStateHolder = settingsStateHolder,
+                backdrop = backdrop,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CompactShell(
+    current: AppDestination,
+    onDestinationSelected: (AppDestination) -> Unit,
+    accountRepository: AccountRepository,
+    settingsStateHolder: SettingsStateHolder,
+    backdrop: Backdrop,
+    glassEnabled: Boolean,
+    floatingBottomBar: Boolean,
+) {
+    val scrollBehavior = key(current) { MiuixScrollBehavior() }
+    val glassNavigationColor = MiuixTheme.colorScheme.surface.copy(alpha = PiliGlassDefaults.SurfaceAlpha)
+
+    Scaffold(
+        modifier = Modifier
+            .fillMaxSize()
+            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = { ShellTopBar(current, scrollBehavior) },
+        bottomBar = {
+            GlassBottomNavigation(
+                selected = current,
+                onSelected = onDestinationSelected,
+                modifier = Modifier
+                    .padding(horizontal = if (floatingBottomBar) 16.dp else 0.dp)
+                    .then(
+                        if (glassEnabled) {
+                            Modifier.drawBackdrop(
                                 backdrop = backdrop,
-                                shape = { RoundedCornerShape(PiliGlassDefaults.NavigationCornerRadius) },
+                                shape = {
+                                    RoundedCornerShape(
+                                        if (floatingBottomBar) PiliGlassDefaults.NavigationCornerRadius else 0.dp,
+                                    )
+                                },
                                 effects = {
                                     vibrancy()
                                     blur(PiliGlassDefaults.BlurRadius.toPx())
@@ -104,46 +182,81 @@ fun MainShell(
                                     )
                                 },
                                 onDrawSurface = { drawRect(glassNavigationColor) },
-                            ),
-                    )
-                }
-            },
-        ) { paddingValues ->
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = paddingValues.calculateTopPadding()),
-            ) {
-                if (useRail) {
-                    NavigationRail(
-                        modifier = Modifier.widthIn(max = 96.dp),
-                        color = MiuixTheme.colorScheme.surface,
-                    ) {
-                        mainDestinations.forEach { destination ->
-                            NavigationRailItem(
-                                selected = current == destination,
-                                onClick = { current = destination },
-                                icon = destination.icon,
-                                label = destination.title,
                             )
-                        }
-                    }
-                }
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(bottom = if (useRail) 0.dp else paddingValues.calculateBottomPadding()),
-                ) {
-                    CurrentDestination(
-                        current = current,
-                        accountRepository = accountRepository,
-                        settingsStateHolder = settingsStateHolder,
-                        backdrop = backdrop,
+                        } else {
+                            Modifier.background(MiuixTheme.colorScheme.surface)
+                        },
+                    ),
+            )
+        },
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = paddingValues.calculateTopPadding())
+                .padding(bottom = paddingValues.calculateBottomPadding()),
+        ) {
+            CurrentDestination(current, accountRepository, settingsStateHolder, backdrop)
+        }
+    }
+}
+
+@Composable
+private fun RailShell(
+    current: AppDestination,
+    onDestinationSelected: (AppDestination) -> Unit,
+    accountRepository: AccountRepository,
+    settingsStateHolder: SettingsStateHolder,
+    backdrop: Backdrop,
+) {
+    val scrollBehavior = key(current) { MiuixScrollBehavior() }
+
+    Scaffold(
+        modifier = Modifier
+            .fillMaxSize()
+            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = { ShellTopBar(current, scrollBehavior) },
+    ) { paddingValues ->
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = paddingValues.calculateTopPadding()),
+        ) {
+            NavigationRail(
+                modifier = Modifier.widthIn(max = 96.dp),
+                color = MiuixTheme.colorScheme.surface,
+            ) {
+                mainDestinations.forEach { destination ->
+                    NavigationRailItem(
+                        selected = current == destination,
+                        onClick = { onDestinationSelected(destination) },
+                        icon = destination.icon,
+                        label = destination.title,
                     )
                 }
             }
+            Box(Modifier.fillMaxSize()) {
+                CurrentDestination(current, accountRepository, settingsStateHolder, backdrop)
+            }
         }
     }
+}
+
+@Composable
+private fun ShellTopBar(
+    current: AppDestination,
+    scrollBehavior: MiuixScrollBehavior,
+) {
+    TopAppBar(
+        title = current.title,
+        largeTitle = when (current) {
+            AppDestination.Home -> "liquidreode"
+            AppDestination.Dynamics -> "动态"
+            AppDestination.Profile -> "个人中心"
+            AppDestination.Settings -> "设置"
+        },
+        scrollBehavior = scrollBehavior,
+    )
 }
 
 @Composable
@@ -154,9 +267,9 @@ private fun CurrentDestination(
     backdrop: Backdrop,
 ) {
     when (current) {
-        AppDestination.Home -> HomeScreen()
+        AppDestination.Home -> HomeScreen(backdrop = backdrop)
         AppDestination.Dynamics -> DynamicsScreen()
-        AppDestination.Profile -> ProfileScreen(accountRepository)
+        AppDestination.Profile -> ProfileScreen(accountRepository, backdrop)
         AppDestination.Settings -> SettingsPage(backdrop, settingsStateHolder)
     }
 }

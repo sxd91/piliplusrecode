@@ -72,6 +72,13 @@ data class NavUserInfo(
     val face: String? = null,
     val money: Double? = null,
     val levelInfo: LevelInfo? = null,
+    @SerialName("wbi_img") val wbiImage: WbiImage? = null,
+)
+
+@Serializable
+data class WbiImage(
+    @SerialName("img_url") val imageUrl: String = "",
+    @SerialName("sub_url") val subUrl: String = "",
 )
 
 @Serializable

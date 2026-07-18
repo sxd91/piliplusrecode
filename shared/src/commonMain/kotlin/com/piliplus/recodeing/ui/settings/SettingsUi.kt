@@ -2,14 +2,18 @@ package com.piliplus.recodeing.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -17,8 +21,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.kyant.backdrop.Backdrop
-import com.piliplus.recodeing.core.design.GlassSurface
+import com.piliplus.recodeing.core.design.LiquidButton
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
@@ -30,9 +35,15 @@ fun SettingsPage(
 ) {
     var selectedCategory by remember { mutableStateOf<SettingsCategory?>(null) }
     val state = stateHolder.state
+    val rootListState = rememberLazyListState()
+    val categoryListStates = remember { mutableStateMapOf<SettingsCategory, androidx.compose.foundation.lazy.LazyListState>() }
+    val activeListState = selectedCategory?.let { category ->
+        categoryListStates.getOrPut(category) { androidx.compose.foundation.lazy.LazyListState() }
+    } ?: rootListState
 
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         LazyColumn(
+            state = activeListState,
             modifier = Modifier.widthIn(max = 680.dp).fillMaxWidth(),
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -40,41 +51,44 @@ fun SettingsPage(
             if (selectedCategory == null) {
                 item {
                     SmallTitle("设置分类")
-                    Card(Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
                         SettingsCategory.entries.forEach { category ->
-                            ArrowPreference(
-                                title = category.title,
-                                summary = category.summary,
+                            LiquidButton(
                                 onClick = { selectedCategory = category },
-                            )
+                                backdrop = backdrop,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(category.title)
+                                    Text(category.summary)
+                                }
+                            }
                         }
                     }
                 }
-                item {
-                    SmallTitle("常用")
-                    GlassSurface(
-                        backdrop = backdrop,
-                        enabled = state.glassEnabled,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        settingSwitch("液态玻璃样式", "用于导航与重点容器", state.glassEnabled) {
-                            stateHolder.update { state -> state.copy(glassEnabled = it) }
-                        }
-                        settingSwitch("自动播放", null, state.autoPlay) {
-                            stateHolder.update { state -> state.copy(autoPlay = it) }
-                        }
-                        settingSwitch("动态未读提醒", null, state.dynamicUnreadBadge) {
-                            stateHolder.update { state -> state.copy(dynamicUnreadBadge = it) }
-                        }
+                settingsGroup("常用") {
+                    settingSwitch("液态玻璃样式", "用于导航与重点容器", state.glassEnabled) {
+                        stateHolder.update { state -> state.copy(glassEnabled = it) }
+                    }
+                    settingSwitch("自动播放", null, state.autoPlay) {
+                        stateHolder.update { state -> state.copy(autoPlay = it) }
+                    }
+                    settingSwitch("动态未读提醒", null, state.dynamicUnreadBadge) {
+                        stateHolder.update { state -> state.copy(dynamicUnreadBadge = it) }
                     }
                 }
             } else {
                 item {
-                    ArrowPreference(
-                        title = "返回设置分类",
-                        summary = selectedCategory?.title,
+                    LiquidButton(
                         onClick = { selectedCategory = null },
-                    )
+                        backdrop = backdrop,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("返回设置分类 · ${selectedCategory?.title.orEmpty()}")
+                    }
                 }
                 categoryContent(selectedCategory!!, state, stateHolder::update)
             }
@@ -229,8 +243,9 @@ private fun LazyListScope.categoryContent(
             ArrowPreference("恢复设置", summary = "替换本机设置，需要确认", onClick = {})
         }
 
-        SettingsCategory.About -> settingsGroup("关于 PiliPlus Recodeing") {
+        SettingsCategory.About -> settingsGroup("关于 liquidreode") {
             ArrowPreference("版本", summary = "0.1.0", onClick = {})
+            ArrowPreference("开发者", summary = "SXD", onClick = {})
             ArrowPreference("日志", summary = "查看、复制、清除与报告问题", onClick = {})
             ArrowPreference("开源许可", summary = "Miuix、Backdrop 与其他依赖", onClick = {})
             ArrowPreference("检查更新", onClick = {})
