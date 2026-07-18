@@ -48,6 +48,7 @@ kotlin {
             implementation(libs.kotlinx.serialization.json)
             implementation(libs.lifecycle.viewmodel)
             implementation(libs.lifecycle.viewmodel.compose)
+            implementation(libs.multiplatform.settings)
         }
 
         androidMain.dependencies {

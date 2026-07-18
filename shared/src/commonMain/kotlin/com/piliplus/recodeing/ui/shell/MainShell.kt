@@ -3,7 +3,6 @@ package com.piliplus.recodeing.ui.shell
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -11,12 +10,13 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.drawRect
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
@@ -26,12 +26,16 @@ import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.lens
 import com.kyant.backdrop.effects.vibrancy
 import com.piliplus.recodeing.core.auth.AccountRepository
+import com.piliplus.recodeing.core.design.PiliGlassDefaults
 import com.piliplus.recodeing.ui.dynamics.DynamicsScreen
 import com.piliplus.recodeing.ui.home.HomeScreen
 import com.piliplus.recodeing.ui.profile.ProfileScreen
 import com.piliplus.recodeing.ui.settings.SettingsPage
+import com.piliplus.recodeing.ui.settings.SettingsStateHolder
+import com.piliplus.recodeing.ui.settings.rememberSettingsRepository
 import top.yukonga.miuix.kmp.basic.FloatingNavigationBar
 import top.yukonga.miuix.kmp.basic.FloatingNavigationBarItem
+import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.NavigationRail
 import top.yukonga.miuix.kmp.basic.NavigationRailItem
 import top.yukonga.miuix.kmp.basic.Scaffold
@@ -45,21 +49,30 @@ fun MainShell(
     accountRepository: AccountRepository = remember { AccountRepository() },
 ) {
     var current by remember { mutableStateOf<AppDestination>(AppDestination.Home) }
-    val backdrop = rememberLayerBackdrop {
-        drawRect(MiuixTheme.colorScheme.background)
-        drawContent()
-    }
+    val settingsRepository = rememberSettingsRepository()
+    val settingsStateHolder = remember(settingsRepository) { SettingsStateHolder(settingsRepository) }
+    val backgroundColor = MiuixTheme.colorScheme.background
+    val glassNavigationColor = MiuixTheme.colorScheme.surface.copy(alpha = PiliGlassDefaults.SurfaceAlpha)
+    val backdrop = rememberLayerBackdrop(
+        onDraw = {
+            drawRect(backgroundColor)
+            drawContent()
+        },
+    )
+    val scrollBehavior = key(current) { MiuixScrollBehavior() }
 
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(MiuixTheme.colorScheme.background)
+            .background(backgroundColor)
             .layerBackdrop(backdrop),
     ) {
         val useRail = maxWidth >= WideNavigationWidth
 
         Scaffold(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .nestedScroll(scrollBehavior.nestedScrollConnection),
             topBar = {
                 TopAppBar(
                     title = current.title,
@@ -69,7 +82,7 @@ fun MainShell(
                         AppDestination.Profile -> "个人中心"
                         AppDestination.Settings -> "设置"
                     },
-                    subtitle = "Compose Multiplatform · Miuix Glass",
+                    scrollBehavior = scrollBehavior,
                 )
             },
             bottomBar = {
@@ -78,18 +91,19 @@ fun MainShell(
                         selected = current,
                         onSelected = { current = it },
                         modifier = Modifier
-                            .padding(horizontal = 18.dp)
+                            .padding(horizontal = 16.dp)
                             .drawBackdrop(
                                 backdrop = backdrop,
-                                shape = { RoundedCornerShape(32.dp) },
+                                shape = { RoundedCornerShape(PiliGlassDefaults.NavigationCornerRadius) },
                                 effects = {
                                     vibrancy()
-                                    blur(4.dp.toPx())
-                                    lens(16.dp.toPx(), 32.dp.toPx())
+                                    blur(PiliGlassDefaults.BlurRadius.toPx())
+                                    lens(
+                                        PiliGlassDefaults.RefractionHeight.toPx(),
+                                        PiliGlassDefaults.RefractionAmount.toPx(),
+                                    )
                                 },
-                                onDrawSurface = {
-                                    drawRect(MiuixTheme.colorScheme.surface.copy(alpha = 0.46f))
-                                },
+                                onDrawSurface = { drawRect(glassNavigationColor) },
                             ),
                     )
                 }
@@ -103,7 +117,7 @@ fun MainShell(
                 if (useRail) {
                     NavigationRail(
                         modifier = Modifier.widthIn(max = 96.dp),
-                        color = MiuixTheme.colorScheme.surface.copy(alpha = 0.78f),
+                        color = MiuixTheme.colorScheme.surface,
                     ) {
                         mainDestinations.forEach { destination ->
                             NavigationRailItem(
@@ -123,6 +137,7 @@ fun MainShell(
                     CurrentDestination(
                         current = current,
                         accountRepository = accountRepository,
+                        settingsStateHolder = settingsStateHolder,
                         backdrop = backdrop,
                     )
                 }
@@ -135,13 +150,14 @@ fun MainShell(
 private fun CurrentDestination(
     current: AppDestination,
     accountRepository: AccountRepository,
+    settingsStateHolder: SettingsStateHolder,
     backdrop: Backdrop,
 ) {
     when (current) {
         AppDestination.Home -> HomeScreen()
         AppDestination.Dynamics -> DynamicsScreen()
         AppDestination.Profile -> ProfileScreen(accountRepository)
-        AppDestination.Settings -> SettingsPage(backdrop)
+        AppDestination.Settings -> SettingsPage(backdrop, settingsStateHolder)
     }
 }
 

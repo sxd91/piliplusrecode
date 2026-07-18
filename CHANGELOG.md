@@ -9,6 +9,9 @@ This file records notable project changes. GitHub Actions also writes the latest
 - Reset Android and Desktop default package versions to semantic baseline `0.1.0`.
 - Updated Gradle wrapper to `9.5.0` to satisfy Android Gradle Plugin `9.3.0` in GitHub Actions.
 - Fixed `desktopMain` unresolved source-set accessor in `desktopApp` and `shared` Gradle scripts.
+- Fixed Backdrop draw-scope imports and moved composable theme reads out of non-composable draw callbacks.
+- Reworked SearchBar state, suggestions, tabs, interactive cards, responsive layouts, title hierarchy, and TopAppBar scrolling to follow Miuix patterns.
+- Added an initial full PiliPlus settings category migration covering privacy, recommendation, audio/video, player, appearance, other, WebDAV, and about options.
 
 - Added cross-platform Compose Multiplatform project scaffold.
 - Added Miuix UI foundation and AndroidLiquidGlass-kmp backdrop integration.

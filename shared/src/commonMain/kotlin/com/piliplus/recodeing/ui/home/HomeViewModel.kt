@@ -11,6 +11,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -31,6 +32,8 @@ enum class HomeTab(val title: String) {
     Popular("热门"),
     Search("搜索"),
 }
+
+private const val SearchSuggestionDebounceMillis = 250L
 
 class HomeViewModel(
     private val feedRepository: FeedRepository = FeedRepository(),
@@ -54,11 +57,26 @@ class HomeViewModel(
     }
 
     fun updateSearchQuery(query: String) {
-        _uiState.update { it.copy(searchQuery = query) }
         suggestJob?.cancel()
+        val keyword = query.trim()
+        _uiState.update {
+            it.copy(
+                searchQuery = query,
+                searchSuggestions = if (keyword.isEmpty()) emptyList() else it.searchSuggestions,
+            )
+        }
+        if (keyword.isEmpty()) return
+
         suggestJob = viewModelScope.launch {
-            searchRepository.suggest(query).onSuccess { suggestions ->
-                _uiState.update { it.copy(searchSuggestions = suggestions) }
+            delay(SearchSuggestionDebounceMillis)
+            searchRepository.suggest(keyword).onSuccess { suggestions ->
+                _uiState.update { state ->
+                    if (state.searchQuery.trim() == keyword) {
+                        state.copy(searchSuggestions = suggestions)
+                    } else {
+                        state
+                    }
+                }
             }
         }
     }
