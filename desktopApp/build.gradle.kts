@@ -10,9 +10,11 @@ kotlin {
     jvm("desktop")
 
     sourceSets {
-        desktopMain.dependencies {
-            implementation(project(":shared"))
-            implementation(compose.desktop.currentOs)
+        named("desktopMain") {
+            dependencies {
+                implementation(project(":shared"))
+                implementation(compose.desktop.currentOs)
+            }
         }
     }
 }

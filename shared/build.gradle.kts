@@ -57,7 +57,7 @@ kotlin {
         val skikoMain by creating {
             dependsOn(commonMain.get())
         }
-        desktopMain.get().apply {
+        getByName("desktopMain").apply {
             dependsOn(skikoMain)
             dependencies {
                 implementation(libs.ktor.client.cio)
