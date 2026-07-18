@@ -1,0 +1,47 @@
+# Gradle
+.gradle/
+build/
+**/build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Kotlin / Compose
+.kotlin/
+composeApp/build/
+
+# Android
+local.properties
+*.apk
+*.aab
+*.ap_
+
+# Apple / Xcode
+DerivedData/
+*.xcuserdata/
+*.xcuserstate
+*.dSYM/
+iosApp/Pods/
+
+# Desktop packages
+*.dmg
+*.msi
+*.deb
+*.rpm
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+gradle-output.txt
+
+# Signing secrets (unused for CI, but never commit if created locally)
+*.jks
+*.keystore
+*.p12
+*.mobileprovision
