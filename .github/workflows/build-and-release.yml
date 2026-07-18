@@ -18,11 +18,6 @@ on:
         description: 'Optional release tag override. Empty = v<auto_version>.'
         required: false
         type: string
-      android_liquid_glass_repository:
-        description: 'GitHub repository or URL for AndroidLiquidGlass-kmp.'
-        required: false
-        default: 'sxd91/AndroidLiquidGlass'
-        type: string
 
 permissions:
   contents: write
@@ -141,12 +136,6 @@ jobs:
             name: desktop-windows
             tasks: :desktopApp:packageMsi
             artifact_glob: recodeing/desktopApp/build/compose/binaries/main/msi/*.msi
-          - os: macos-latest
-            name: apple-desktop-macos
-            tasks: :desktopApp:packageDmg :macosApp:macosArm64Binaries
-            artifact_glob: |
-              recodeing/desktopApp/build/compose/binaries/main/dmg/*.dmg
-              recodeing/macosApp/build/bin/macosArm64/releaseExecutable/*
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout recodeing
@@ -154,40 +143,6 @@ jobs:
         with:
           path: recodeing
           fetch-depth: 0
-
-      - name: Checkout Miuix sibling build
-        uses: actions/checkout@v4
-        with:
-          repository: compose-miuix-ui/miuix
-          path: miuix
-
-      - name: Resolve AndroidLiquidGlass-kmp repository
-        id: liquid_glass
-        shell: bash
-        run: |
-          REPO='${{ inputs.android_liquid_glass_repository }}'
-          if [ -z "$REPO" ]; then
-            REPO='${{ vars.ANDROID_LIQUID_GLASS_REPOSITORY }}'
-          fi
-          if [ -z "$REPO" ]; then
-            REPO='sxd91/AndroidLiquidGlass'
-          fi
-          REPO="${REPO#https://github.com/}"
-          REPO="${REPO#http://github.com/}"
-          REPO="${REPO#git@github.com:}"
-          REPO="${REPO%.git}"
-          REPO="${REPO%/}"
-          if ! echo "$REPO" | grep -Eq '^[^/]+/[^/]+$'; then
-            echo "Invalid AndroidLiquidGlass repository '$REPO'. Expected owner/repo or GitHub URL." >&2
-            exit 1
-          fi
-          echo "repository=$REPO" >> "$GITHUB_OUTPUT"
-
-      - name: Checkout AndroidLiquidGlass-kmp sibling build
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ steps.liquid_glass.outputs.repository }}
-          path: AndroidLiquidGlass-kmp
 
       - name: Setup JDK
         uses: actions/setup-java@v4
@@ -254,7 +209,7 @@ jobs:
           {
             echo "# PiliPlus Recodeing ${VERSION}"
             echo
-            echo "Unsigned cross-platform build artifacts. Android and desktop/macOS outputs are intentionally not signed."
+            echo "Unsigned Android and Linux/Windows desktop build artifacts. Apple targets are not published."
             echo
             if [ -f release-notes/last-detected-changes.md ]; then
               cat release-notes/last-detected-changes.md
