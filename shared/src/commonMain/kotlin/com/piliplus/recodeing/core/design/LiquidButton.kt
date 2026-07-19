@@ -54,11 +54,12 @@ fun LiquidButton(
     backdrop: Backdrop,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    compact: Boolean = false,
     adaptiveLuminance: Boolean = false,
     tint: Color = Color.Unspecified,
     content: @Composable RowScope.() -> Unit,
 ) {
-    val useGlass = platformSupportsLiquidGlass()
+    val useGlass = LocalLiquidGlassEnabled.current && platformSupportsLiquidGlass()
     val useAdaptiveLuminance = useGlass && adaptiveLuminance
     val scope = rememberCoroutineScope()
     val pressProgress = remember { Animatable(0f) }
@@ -189,8 +190,8 @@ fun LiquidButton(
                 onClick = onClick,
             )
             .then(interactionModifier)
-            .height(48.dp)
-            .padding(horizontal = 16.dp),
+            .height(if (compact) 44.dp else 48.dp)
+            .padding(horizontal = if (compact) 0.dp else 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {

@@ -23,3 +23,9 @@ val mainDestinations = listOf(
     AppDestination.Profile,
     AppDestination.Settings,
 )
+
+sealed interface SecondaryDestination {
+    data object Search : SecondaryDestination
+
+    data class Video(val bvid: String) : SecondaryDestination
+}

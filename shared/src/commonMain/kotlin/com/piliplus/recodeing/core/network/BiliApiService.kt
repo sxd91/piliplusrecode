@@ -15,6 +15,8 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
+import io.ktor.client.request.forms.submitForm
+import io.ktor.http.Parameters
 
 class BiliApiService(
     cookieHeaderProvider: () -> String = { "" },
@@ -119,5 +121,33 @@ class BiliApiService(
         return client.get(BiliApiConstants.VIDEO_PLAY_URL) {
             params.forEach { (key, value) -> parameter(key, value) }
         }.body()
+    }
+
+    suspend fun likeVideo(aid: Long, like: Boolean, csrf: String): BiliResponse<kotlinx.serialization.json.JsonElement> {
+        return client.submitForm(
+            url = BiliApiConstants.VIDEO_LIKE,
+            formParameters = Parameters.build {
+                append("aid", aid.toString())
+                append("like", if (like) "1" else "2")
+                append("csrf", csrf)
+            },
+        ).body()
+    }
+
+    suspend fun coinVideo(
+        aid: Long,
+        count: Int,
+        alsoLike: Boolean,
+        csrf: String,
+    ): BiliResponse<kotlinx.serialization.json.JsonElement> {
+        return client.submitForm(
+            url = BiliApiConstants.VIDEO_COIN,
+            formParameters = Parameters.build {
+                append("aid", aid.toString())
+                append("multiply", count.coerceIn(1, 2).toString())
+                append("select_like", if (alsoLike) "1" else "0")
+                append("csrf", csrf)
+            },
+        ).body()
     }
 }

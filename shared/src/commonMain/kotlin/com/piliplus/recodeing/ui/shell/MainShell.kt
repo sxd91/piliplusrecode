@@ -1,5 +1,11 @@
 package com.piliplus.recodeing.ui.shell
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -9,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,11 +34,13 @@ import com.kyant.backdrop.effects.lens
 import com.kyant.backdrop.effects.vibrancy
 import com.piliplus.recodeing.core.auth.AccountRepository
 import com.piliplus.recodeing.core.auth.rememberAccountRepository
+import com.piliplus.recodeing.core.design.LocalLiquidGlassEnabled
 import com.piliplus.recodeing.core.design.PiliGlassDefaults
 import com.piliplus.recodeing.core.design.platformSupportsLiquidGlass
 import com.piliplus.recodeing.ui.dynamics.DynamicsScreen
 import com.piliplus.recodeing.ui.home.HomeScreen
 import com.piliplus.recodeing.ui.profile.ProfileScreen
+import com.piliplus.recodeing.ui.search.SearchScreen
 import com.piliplus.recodeing.ui.settings.SettingsPage
 import com.piliplus.recodeing.ui.settings.SettingsStateHolder
 import com.piliplus.recodeing.ui.settings.rememberSettingsRepository
@@ -57,7 +66,8 @@ fun MainShell(
     accountRepository: AccountRepository = rememberAccountRepository(),
 ) {
     var current by remember { mutableStateOf<AppDestination>(AppDestination.Home) }
-    var selectedVideoId by remember { mutableStateOf<String?>(null) }
+    var secondaryStack by remember { mutableStateOf<List<SecondaryDestination>>(emptyList()) }
+    val secondary = secondaryStack.lastOrNull()
     val settingsRepository = rememberSettingsRepository()
     val settingsStateHolder = remember(settingsRepository) { SettingsStateHolder(settingsRepository) }
 
@@ -74,10 +84,20 @@ fun MainShell(
         ShellWithBackdrop(
             navigationMode = navigationMode,
             current = current,
-            onDestinationSelected = { current = it },
-            selectedVideoId = selectedVideoId,
-            onVideoSelected = { selectedVideoId = it },
-            onVideoBack = { selectedVideoId = null },
+            secondary = secondary,
+            onDestinationSelected = {
+                current = it
+                secondaryStack = emptyList()
+            },
+            onSecondarySelected = { destination ->
+                secondaryStack = when {
+                    destination is SecondaryDestination.Video && secondaryStack.lastOrNull() is SecondaryDestination.Video -> {
+                        secondaryStack.dropLast(1) + destination
+                    }
+                    else -> secondaryStack + destination
+                }
+            },
+            onSecondaryBack = { secondaryStack = secondaryStack.dropLast(1) },
             accountRepository = accountRepository,
             settingsStateHolder = settingsStateHolder,
             glassEnabled = settings.glassEnabled && platformSupportsLiquidGlass(),
@@ -103,16 +123,15 @@ private fun resolveNavigationMode(
 private fun ShellWithBackdrop(
     navigationMode: WindowNavigationMode,
     current: AppDestination,
+    secondary: SecondaryDestination?,
     onDestinationSelected: (AppDestination) -> Unit,
-    selectedVideoId: String?,
-    onVideoSelected: (String) -> Unit,
-    onVideoBack: () -> Unit,
+    onSecondarySelected: (SecondaryDestination) -> Unit,
+    onSecondaryBack: () -> Unit,
     accountRepository: AccountRepository,
     settingsStateHolder: SettingsStateHolder,
     glassEnabled: Boolean,
     floatingBottomBar: Boolean,
 ) {
-    val useGlass = glassEnabled && platformSupportsLiquidGlass()
     val backgroundColor = MiuixTheme.colorScheme.background
     val backdrop = rememberLayerBackdrop(
         onDraw = {
@@ -121,36 +140,38 @@ private fun ShellWithBackdrop(
         },
     )
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(backgroundColor)
-            .then(if (useGlass) Modifier.layerBackdrop(backdrop) else Modifier),
-    ) {
-        when (navigationMode) {
-            WindowNavigationMode.CompactBottomBar -> CompactShell(
-                current = current,
-                onDestinationSelected = onDestinationSelected,
-                accountRepository = accountRepository,
-                settingsStateHolder = settingsStateHolder,
-                backdrop = backdrop,
-                selectedVideoId = selectedVideoId,
-                onVideoSelected = onVideoSelected,
-                onVideoBack = onVideoBack,
-                glassEnabled = useGlass,
-                floatingBottomBar = floatingBottomBar,
-            )
-
-            WindowNavigationMode.SideRail -> RailShell(
-                current = current,
-                onDestinationSelected = onDestinationSelected,
-                selectedVideoId = selectedVideoId,
-                onVideoSelected = onVideoSelected,
-                onVideoBack = onVideoBack,
-                accountRepository = accountRepository,
-                settingsStateHolder = settingsStateHolder,
-                backdrop = backdrop,
-            )
+    CompositionLocalProvider(LocalLiquidGlassEnabled provides glassEnabled) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(backgroundColor)
+                .then(if (glassEnabled) Modifier.layerBackdrop(backdrop) else Modifier),
+        ) {
+            when (navigationMode) {
+                WindowNavigationMode.CompactBottomBar -> CompactShell(
+                    current = current,
+                    secondary = secondary,
+                    onDestinationSelected = onDestinationSelected,
+                    onSecondarySelected = onSecondarySelected,
+                    onSecondaryBack = onSecondaryBack,
+                    accountRepository = accountRepository,
+                    settingsStateHolder = settingsStateHolder,
+                    backdrop = backdrop,
+                    glassEnabled = glassEnabled,
+                    floatingBottomBar = floatingBottomBar,
+                )
+                WindowNavigationMode.SideRail -> RailShell(
+                    current = current,
+                    secondary = secondary,
+                    onDestinationSelected = onDestinationSelected,
+                    onSecondarySelected = onSecondarySelected,
+                    onSecondaryBack = onSecondaryBack,
+                    accountRepository = accountRepository,
+                    settingsStateHolder = settingsStateHolder,
+                    backdrop = backdrop,
+                    glassEnabled = glassEnabled,
+                )
+            }
         }
     }
 }
@@ -158,53 +179,38 @@ private fun ShellWithBackdrop(
 @Composable
 private fun CompactShell(
     current: AppDestination,
+    secondary: SecondaryDestination?,
     onDestinationSelected: (AppDestination) -> Unit,
-    selectedVideoId: String?,
-    onVideoSelected: (String) -> Unit,
-    onVideoBack: () -> Unit,
+    onSecondarySelected: (SecondaryDestination) -> Unit,
+    onSecondaryBack: () -> Unit,
     accountRepository: AccountRepository,
     settingsStateHolder: SettingsStateHolder,
     backdrop: Backdrop,
     glassEnabled: Boolean,
     floatingBottomBar: Boolean,
 ) {
+    if (secondary != null) {
+        SecondaryContent(
+            destination = secondary,
+            onBack = onSecondaryBack,
+            onSecondarySelected = onSecondarySelected,
+            accountRepository = accountRepository,
+            settingsStateHolder = settingsStateHolder,
+            backdrop = backdrop,
+        )
+        return
+    }
     val scrollBehavior = MiuixScrollBehavior()
-    val glassNavigationColor = MiuixTheme.colorScheme.surface.copy(alpha = PiliGlassDefaults.SurfaceAlpha)
-
     Scaffold(
-        modifier = Modifier
-            .fillMaxSize()
-            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = { ShellTopBar(current, scrollBehavior) },
         bottomBar = {
             GlassBottomNavigation(
                 selected = current,
                 onSelected = onDestinationSelected,
-                modifier = Modifier
-                    .padding(horizontal = if (floatingBottomBar) 16.dp else 0.dp)
-                    .then(
-                        if (glassEnabled) {
-                            Modifier.drawBackdrop(
-                                backdrop = backdrop,
-                                shape = {
-                                    RoundedCornerShape(
-                                        if (floatingBottomBar) PiliGlassDefaults.NavigationCornerRadius else 0.dp,
-                                    )
-                                },
-                                effects = {
-                                    vibrancy()
-                                    blur(PiliGlassDefaults.BlurRadius.toPx())
-                                    lens(
-                                        PiliGlassDefaults.RefractionHeight.toPx(),
-                                        PiliGlassDefaults.RefractionAmount.toPx(),
-                                    )
-                                },
-                                onDrawSurface = { drawRect(glassNavigationColor) },
-                            )
-                        } else {
-                            Modifier.background(MiuixTheme.colorScheme.surface)
-                        },
-                    ),
+                backdrop = backdrop,
+                glassEnabled = glassEnabled,
+                modifier = Modifier.padding(horizontal = if (floatingBottomBar) 16.dp else 0.dp),
             )
         },
     ) { paddingValues ->
@@ -214,11 +220,9 @@ private fun CompactShell(
                 .padding(top = paddingValues.calculateTopPadding())
                 .padding(bottom = paddingValues.calculateBottomPadding()),
         ) {
-            CurrentDestination(
+            RootDestination(
                 current = current,
-                selectedVideoId = selectedVideoId,
-                onVideoSelected = onVideoSelected,
-                onVideoBack = onVideoBack,
+                onSecondarySelected = onSecondarySelected,
                 accountRepository = accountRepository,
                 settingsStateHolder = settingsStateHolder,
                 backdrop = backdrop,
@@ -230,30 +234,35 @@ private fun CompactShell(
 @Composable
 private fun RailShell(
     current: AppDestination,
+    secondary: SecondaryDestination?,
     onDestinationSelected: (AppDestination) -> Unit,
-    selectedVideoId: String?,
-    onVideoSelected: (String) -> Unit,
-    onVideoBack: () -> Unit,
+    onSecondarySelected: (SecondaryDestination) -> Unit,
+    onSecondaryBack: () -> Unit,
     accountRepository: AccountRepository,
     settingsStateHolder: SettingsStateHolder,
     backdrop: Backdrop,
+    glassEnabled: Boolean,
 ) {
+    if (secondary != null) {
+        SecondaryContent(
+            destination = secondary,
+            onBack = onSecondaryBack,
+            onSecondarySelected = onSecondarySelected,
+            accountRepository = accountRepository,
+            settingsStateHolder = settingsStateHolder,
+            backdrop = backdrop,
+        )
+        return
+    }
     val scrollBehavior = MiuixScrollBehavior()
-
     Scaffold(
-        modifier = Modifier
-            .fillMaxSize()
-            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = { ShellTopBar(current, scrollBehavior) },
     ) { paddingValues ->
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = paddingValues.calculateTopPadding()),
-        ) {
+        Row(Modifier.fillMaxSize().padding(top = paddingValues.calculateTopPadding())) {
             NavigationRail(
                 modifier = Modifier.widthIn(max = 96.dp),
-                color = MiuixTheme.colorScheme.surface,
+                color = if (glassEnabled) Color.Transparent else MiuixTheme.colorScheme.surface,
             ) {
                 mainDestinations.forEach { destination ->
                     NavigationRailItem(
@@ -265,25 +274,20 @@ private fun RailShell(
                 }
             }
             Box(Modifier.fillMaxSize()) {
-                CurrentDestination(
-                current = current,
-                selectedVideoId = selectedVideoId,
-                onVideoSelected = onVideoSelected,
-                onVideoBack = onVideoBack,
-                accountRepository = accountRepository,
-                settingsStateHolder = settingsStateHolder,
-                backdrop = backdrop,
-            )
+                RootDestination(
+                    current = current,
+                    onSecondarySelected = onSecondarySelected,
+                    accountRepository = accountRepository,
+                    settingsStateHolder = settingsStateHolder,
+                    backdrop = backdrop,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun ShellTopBar(
-    current: AppDestination,
-    scrollBehavior: ScrollBehavior,
-) {
+private fun ShellTopBar(current: AppDestination, scrollBehavior: ScrollBehavior) {
     TopAppBar(
         title = current.title,
         largeTitle = when (current) {
@@ -297,36 +301,66 @@ private fun ShellTopBar(
 }
 
 @Composable
-private fun CurrentDestination(
+private fun RootDestination(
     current: AppDestination,
-    selectedVideoId: String?,
-    onVideoSelected: (String) -> Unit,
-    onVideoBack: () -> Unit,
+    onSecondarySelected: (SecondaryDestination) -> Unit,
     accountRepository: AccountRepository,
     settingsStateHolder: SettingsStateHolder,
     backdrop: Backdrop,
 ) {
-    if (selectedVideoId != null) {
-        VideoDetailScreen(
-            bvid = selectedVideoId,
-            onBack = onVideoBack,
-            onPlay = { },
-            onVideoSelected = onVideoSelected,
-        )
-        return
+    AnimatedContent(
+        targetState = current,
+        transitionSpec = { (fadeIn() + scaleIn(initialScale = 0.985f)).togetherWith(fadeOut() + scaleOut(targetScale = 0.985f)) },
+    ) { destination ->
+        when (destination) {
+            AppDestination.Home -> HomeScreen(
+                backdrop = backdrop,
+                feedColumns = settingsStateHolder.state.homeFeedColumns,
+                onSearch = { onSecondarySelected(SecondaryDestination.Search) },
+                onVideoSelected = { onSecondarySelected(SecondaryDestination.Video(it)) },
+            )
+            AppDestination.Dynamics -> DynamicsScreen(
+                accountRepository = accountRepository,
+                backdrop = backdrop,
+                onVideoSelected = { onSecondarySelected(SecondaryDestination.Video(it)) },
+            )
+            AppDestination.Profile -> ProfileScreen(accountRepository, backdrop)
+            AppDestination.Settings -> SettingsPage(backdrop, settingsStateHolder)
+        }
     }
-    when (current) {
-        AppDestination.Home -> HomeScreen(
-            backdrop = backdrop,
-            onVideoSelected = onVideoSelected,
-        )
-        AppDestination.Dynamics -> DynamicsScreen(
-            accountRepository = accountRepository,
-            backdrop = backdrop,
-            onVideoSelected = onVideoSelected,
-        )
-        AppDestination.Profile -> ProfileScreen(accountRepository, backdrop)
-        AppDestination.Settings -> SettingsPage(backdrop, settingsStateHolder)
+}
+
+@Composable
+private fun SecondaryContent(
+    destination: SecondaryDestination,
+    onBack: () -> Unit,
+    onSecondarySelected: (SecondaryDestination) -> Unit,
+    accountRepository: AccountRepository,
+    settingsStateHolder: SettingsStateHolder,
+    backdrop: Backdrop,
+) {
+    AnimatedContent(
+        targetState = destination,
+        modifier = Modifier.fillMaxSize(),
+        transitionSpec = { (fadeIn() + scaleIn(initialScale = 0.985f)).togetherWith(fadeOut() + scaleOut(targetScale = 0.985f)) },
+    ) { target ->
+        when (target) {
+            SecondaryDestination.Search -> SearchScreen(
+                backdrop = backdrop,
+                onBack = onBack,
+                onVideoSelected = { onSecondarySelected(SecondaryDestination.Video(it)) },
+            )
+            is SecondaryDestination.Video -> VideoDetailScreen(
+                bvid = target.bvid,
+                backdrop = backdrop,
+                accountRepository = accountRepository,
+                settings = settingsStateHolder.state,
+                onBack = onBack,
+                onPlay = { },
+                onVideoSelected = { onSecondarySelected(SecondaryDestination.Video(it)) },
+                onAuthorSelected = { },
+            )
+        }
     }
 }
 
@@ -334,10 +368,28 @@ private fun CurrentDestination(
 private fun GlassBottomNavigation(
     selected: AppDestination,
     onSelected: (AppDestination) -> Unit,
+    backdrop: Backdrop,
+    glassEnabled: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val glassColor = MiuixTheme.colorScheme.surface.copy(alpha = PiliGlassDefaults.SurfaceAlpha)
     FloatingNavigationBar(
-        modifier = modifier,
+        modifier = modifier.then(
+            if (glassEnabled) {
+                Modifier.drawBackdrop(
+                    backdrop = backdrop,
+                    shape = { RoundedCornerShape(PiliGlassDefaults.NavigationCornerRadius) },
+                    effects = {
+                        vibrancy()
+                        blur(8.dp.toPx())
+                        lens(24.dp.toPx(), 24.dp.toPx(), depthEffect = true)
+                    },
+                    onDrawSurface = { drawRect(glassColor) },
+                )
+            } else {
+                Modifier.background(MiuixTheme.colorScheme.surface)
+            },
+        ),
         color = Color.Transparent,
         showDivider = false,
     ) {

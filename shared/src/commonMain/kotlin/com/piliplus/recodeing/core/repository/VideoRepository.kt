@@ -29,4 +29,16 @@ class VideoRepository(
         require(response.code == 0) { response.message.ifBlank { "播放地址加载失败" } }
         requireNotNull(response.data) { "播放地址为空" }
     }
+
+    suspend fun like(aid: Long, like: Boolean, csrf: String): Result<Unit> = runCatching {
+        require(csrf.isNotBlank()) { "登录会话缺少 bili_jct" }
+        val response = service.likeVideo(aid = aid, like = like, csrf = csrf)
+        require(response.code == 0) { response.message.ifBlank { "点赞失败" } }
+    }
+
+    suspend fun coin(aid: Long, count: Int, alsoLike: Boolean, csrf: String): Result<Unit> = runCatching {
+        require(csrf.isNotBlank()) { "登录会话缺少 bili_jct" }
+        val response = service.coinVideo(aid = aid, count = count, alsoLike = alsoLike, csrf = csrf)
+        require(response.code == 0) { response.message.ifBlank { "投币失败" } }
+    }
 }

@@ -84,6 +84,8 @@ data class SettingsUiState(
     val commentSort: String = "热门",
     val dynamicTab: String = "全部",
     val maxCacheSize: String = "1 GiB",
+    val homeFeedColumns: Int = 0,
+    val selectedCdnHost: String = "自动选择",
 )
 
 class SettingsStateHolder(
