@@ -2,6 +2,7 @@ package com.piliplus.recodeing.core.auth
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import com.piliplus.recodeing.core.model.TvQrLoginData
 import com.piliplus.recodeing.core.network.BiliApiConstants
 import com.piliplus.recodeing.core.network.BiliApiService
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -92,7 +93,7 @@ class AccountRepository(
         authState
     }
 
-    fun importCookies(rawCookieHeader: String): Result<Unit> = runCatching {
+    suspend fun importAndValidateCookies(rawCookieHeader: String): Result<AuthState> = runCatching {
         val cookies = rawCookieHeader.split(';').mapNotNull { part ->
             val separator = part.indexOf('=')
             if (separator <= 0) return@mapNotNull null
@@ -100,8 +101,29 @@ class AccountRepository(
             val value = part.substring(separator + 1).trim()
             if (name.isBlank() || value.isBlank()) null else SessionCookie(name, value)
         }
-        require(cookies.isNotEmpty()) { "Cookie 内容为空" }
+        require(cookies.any { it.name == "SESSDATA" }) { "Cookie 缺少 SESSDATA" }
+        replaceCookiesAndValidate(cookies)
+    }
+
+    suspend fun completeTvQrLogin(data: TvQrLoginData): Result<AuthState> = runCatching {
+        val cookies = data.cookieInfo?.cookies.orEmpty()
+            .filter { it.name.isNotBlank() && it.value.isNotBlank() }
+            .map { SessionCookie(name = it.name, value = it.value) }
+        require(cookies.any { it.name == "SESSDATA" }) { "扫码结果缺少 SESSDATA" }
+        replaceCookiesAndValidate(cookies)
+    }
+
+    private suspend fun replaceCookiesAndValidate(cookies: List<SessionCookie>): AuthState {
+        val previousCookies = sessionStore.loadCookies()
         sessionStore.saveCookies(cookies)
+        return try {
+            refreshSession().getOrThrow().also { state ->
+                require(state is AuthState.LoggedIn) { "账号会话验证失败" }
+            }
+        } catch (error: Throwable) {
+            sessionStore.saveCookies(previousCookies)
+            throw error
+        }
     }
 
     fun storedCookies(): List<SessionCookie> = sessionStore.loadCookies()

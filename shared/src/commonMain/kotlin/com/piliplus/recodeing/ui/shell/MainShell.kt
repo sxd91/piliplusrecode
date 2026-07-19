@@ -39,7 +39,9 @@ import com.piliplus.recodeing.core.design.PiliGlassDefaults
 import com.piliplus.recodeing.core.design.platformSupportsLiquidGlass
 import com.piliplus.recodeing.ui.dynamics.DynamicsScreen
 import com.piliplus.recodeing.ui.home.HomeScreen
+import com.piliplus.recodeing.ui.profile.LoginScreen
 import com.piliplus.recodeing.ui.profile.ProfileScreen
+import com.piliplus.recodeing.ui.profile.UserSpaceScreen
 import com.piliplus.recodeing.ui.search.SearchScreen
 import com.piliplus.recodeing.ui.settings.SettingsPage
 import com.piliplus.recodeing.ui.settings.SettingsStateHolder
@@ -91,9 +93,14 @@ fun MainShell(
             },
             onSecondarySelected = { destination ->
                 secondaryStack = when {
+                    secondaryStack.lastOrNull() == destination -> secondaryStack
                     destination is SecondaryDestination.Video && secondaryStack.lastOrNull() is SecondaryDestination.Video -> {
                         secondaryStack.dropLast(1) + destination
                     }
+                    destination is SecondaryDestination.User && secondaryStack.lastOrNull() is SecondaryDestination.User -> {
+                        secondaryStack.dropLast(1) + destination
+                    }
+                    destination is SecondaryDestination.Login -> secondaryStack.filterNot { it is SecondaryDestination.Login } + destination
                     else -> secondaryStack + destination
                 }
             },
@@ -324,7 +331,11 @@ private fun RootDestination(
                 backdrop = backdrop,
                 onVideoSelected = { onSecondarySelected(SecondaryDestination.Video(it)) },
             )
-            AppDestination.Profile -> ProfileScreen(accountRepository, backdrop)
+            AppDestination.Profile -> ProfileScreen(
+                accountRepository = accountRepository,
+                backdrop = backdrop,
+                onLogin = { onSecondarySelected(SecondaryDestination.Login) },
+            )
             AppDestination.Settings -> SettingsPage(backdrop, settingsStateHolder)
         }
     }
@@ -350,6 +361,11 @@ private fun SecondaryContent(
                 onBack = onBack,
                 onVideoSelected = { onSecondarySelected(SecondaryDestination.Video(it)) },
             )
+            SecondaryDestination.Login -> LoginScreen(
+                accountRepository = accountRepository,
+                backdrop = backdrop,
+                onBack = onBack,
+            )
             is SecondaryDestination.Video -> VideoDetailScreen(
                 bvid = target.bvid,
                 backdrop = backdrop,
@@ -358,7 +374,13 @@ private fun SecondaryContent(
                 onBack = onBack,
                 onPlay = { },
                 onVideoSelected = { onSecondarySelected(SecondaryDestination.Video(it)) },
-                onAuthorSelected = { },
+                onAuthorSelected = { onSecondarySelected(SecondaryDestination.User(it)) },
+            )
+            is SecondaryDestination.User -> UserSpaceScreen(
+                mid = target.mid,
+                backdrop = backdrop,
+                onBack = onBack,
+                onVideoSelected = { onSecondarySelected(SecondaryDestination.Video(it)) },
             )
         }
     }

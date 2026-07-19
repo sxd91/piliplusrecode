@@ -22,6 +22,12 @@ object BiliApiConstants {
     const val VIDEO_LIKE = "/x/web-interface/archive/like"
     const val VIDEO_COIN = "/x/web-interface/coin/add"
     const val DYNAMIC_FEED = "/x/polymer/web-dynamic/v1/feed/all"
+    const val USER_SPACE_PROFILE = "/x/space/wbi/acc/info"
+    const val USER_RELATION_STAT = "/x/relation/stat"
+    const val USER_SPACE_VIDEOS = "/x/space/wbi/arc/search"
+
+    const val TV_QR_CREATE = "$PASSPORT_BASE_URL/x/passport-tv-login/qrcode/auth_code"
+    const val TV_QR_POLL = "$PASSPORT_BASE_URL/x/passport-tv-login/qrcode/poll"
 
     const val OFFICIAL_LOGIN_URL = "$PASSPORT_BASE_URL/login"
     const val OFFICIAL_REGISTER_URL = "$PASSPORT_BASE_URL/register/phone.html"

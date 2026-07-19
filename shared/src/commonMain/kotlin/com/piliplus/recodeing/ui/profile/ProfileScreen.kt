@@ -16,10 +16,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -28,9 +24,7 @@ import com.piliplus.recodeing.core.auth.AuthState
 import com.kyant.backdrop.Backdrop
 import com.piliplus.recodeing.core.design.BiliAsyncImage
 import com.piliplus.recodeing.core.design.LiquidButton
-import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.InputField
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -39,16 +33,16 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 fun ProfileScreen(
     accountRepository: AccountRepository,
     backdrop: Backdrop,
+    onLogin: () -> Unit,
 ) {
     val authState by accountRepository.authState.collectAsState()
     val accounts by accountRepository.accounts.collectAsState()
-    val coroutineScope = rememberCoroutineScope()
-    var cookieInput by remember { mutableStateOf("") }
-    var cookieError by remember { mutableStateOf<String?>(null) }
-    var cookieImporting by remember { mutableStateOf(false) }
+    var accountMessage by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
 
     LaunchedEffect(accountRepository) {
-        accountRepository.refreshSession()
+        if (accountRepository.storedCookies().isNotEmpty()) {
+            accountRepository.refreshSession()
+        }
     }
 
     Box(
@@ -72,63 +66,24 @@ fun ProfileScreen(
                         AuthState.Anonymous -> {
                             Text("未登录", style = MiuixTheme.textStyles.title3)
                             Text(
-                                "可在应用内导入浏览器复制的 Bilibili Cookie；密码、短信和扫码登录仍需完成官方风控流程。",
+                                "支持 Bilibili 客户端扫码登录，也可导入浏览器 Cookie。密码和短信登录仍需接入官方风控流程。",
                                 modifier = Modifier.padding(top = 8.dp),
                                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                             )
-                            InputField(
-                                query = cookieInput,
-                                onQueryChange = {
-                                    cookieInput = it
-                                    cookieError = null
-                                },
-                                onSearch = { },
-                                expanded = false,
-                                onExpandedChange = { },
-                                label = "粘贴 Cookie，如 SESSDATA=...; bili_jct=...",
+                            LiquidButton(
+                                onClick = onLogin,
+                                backdrop = backdrop,
                                 modifier = Modifier.padding(top = 16.dp),
-                            )
-                            cookieError?.let { message ->
+                                tint = MiuixTheme.colorScheme.primary.copy(alpha = 0.18f),
+                            ) {
+                                Text("扫码或 Cookie 登录")
+                            }
+                            accountMessage?.let { message ->
                                 Text(
                                     message,
                                     modifier = Modifier.padding(top = 8.dp),
                                     color = MiuixTheme.colorScheme.error,
                                 )
-                            }
-                            FlowRow(
-                                modifier = Modifier.padding(top = 16.dp),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                LiquidButton(
-                                    onClick = {
-                                        cookieImporting = true
-                                        accountRepository.importCookies(cookieInput).fold(
-                                            onSuccess = {
-                                                cookieInput = ""
-                                                cookieError = null
-                                            },
-                                            onFailure = { cookieError = it.message ?: "Cookie 导入失败" },
-                                        )
-                                        cookieImporting = false
-                                    },
-                                    backdrop = backdrop,
-                                    tint = MiuixTheme.colorScheme.primary.copy(alpha = 0.18f),
-                                ) {
-                                    Text(if (cookieImporting) "导入中" else "导入 Cookie")
-                                }
-                                LiquidButton(
-                                    onClick = {
-                                        coroutineScope.launch {
-                                            accountRepository.refreshSession().onFailure {
-                                                cookieError = it.message ?: "会话验证失败"
-                                            }
-                                        }
-                                    },
-                                    backdrop = backdrop,
-                                ) {
-                                    Text("验证会话")
-                                }
                             }
                         }
                         is AuthState.LoggedIn -> {
@@ -182,7 +137,7 @@ fun ProfileScreen(
                                 LiquidButton(
                                     onClick = {
                                         accountRepository.switchAccount(account.id).onFailure {
-                                            cookieError = it.message ?: "账号切换失败"
+                                            accountMessage = it.message ?: "账号切换失败"
                                         }
                                     },
                                     backdrop = backdrop,

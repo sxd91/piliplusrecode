@@ -56,7 +56,6 @@ fun createBiliHttpClient(cookieHeaderProvider: () -> String = { "" }): HttpClien
             protocol = URLProtocol.HTTPS
             host = "api.bilibili.com"
         }
-        contentType(ContentType.Application.Json)
         accept(ContentType.Application.Json)
         header(HttpHeaders.AcceptLanguage, "zh-CN,zh;q=0.9")
         header(HttpHeaders.Referrer, BiliApiConstants.WEB_BASE_URL)

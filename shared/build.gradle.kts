@@ -45,6 +45,7 @@ kotlin {
 
         androidMain.dependencies {
             implementation(libs.ktor.client.okhttp)
+            implementation(libs.zxing.core)
             implementation(libs.androidx.media3.exoplayer)
             implementation(libs.androidx.media3.ui)
             implementation(libs.androidx.media3.datasource)
@@ -53,6 +54,7 @@ kotlin {
 
         getByName("desktopMain").dependencies {
             implementation(libs.ktor.client.cio)
+            implementation(libs.zxing.core)
         }
     }
 }

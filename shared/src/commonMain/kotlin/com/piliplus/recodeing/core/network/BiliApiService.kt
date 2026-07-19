@@ -9,6 +9,11 @@ import com.piliplus.recodeing.core.model.RecommendItem
 import com.piliplus.recodeing.core.model.SearchAllData
 import com.piliplus.recodeing.core.model.SearchDefaultData
 import com.piliplus.recodeing.core.model.SearchSuggestEnvelope
+import com.piliplus.recodeing.core.model.TvQrCodeData
+import com.piliplus.recodeing.core.model.TvQrLoginData
+import com.piliplus.recodeing.core.model.UserRelationStat
+import com.piliplus.recodeing.core.model.UserSpaceProfile
+import com.piliplus.recodeing.core.model.UserVideoSearchData
 import com.piliplus.recodeing.core.model.VideoDetail
 import com.piliplus.recodeing.core.model.VideoPlayUrl
 import io.ktor.client.HttpClient
@@ -51,11 +56,62 @@ class BiliApiService(
         return client.get(BiliApiConstants.USER_INFO).body()
     }
 
+    suspend fun createTvQrCode(): BiliResponse<TvQrCodeData> {
+        return client.submitForm(
+            url = BiliApiConstants.TV_QR_CREATE,
+            formParameters = tvSignedParameters(),
+        ) {
+            url {
+                protocol = io.ktor.http.URLProtocol.HTTPS
+                host = "passport.bilibili.com"
+            }
+        }.body()
+    }
+
+    suspend fun pollTvQrCode(authCode: String): BiliResponse<TvQrLoginData> {
+        return client.submitForm(
+            url = BiliApiConstants.TV_QR_POLL,
+            formParameters = tvSignedParameters(mapOf("auth_code" to authCode)),
+        ) {
+            url {
+                protocol = io.ktor.http.URLProtocol.HTTPS
+                host = "passport.bilibili.com"
+            }
+        }.body()
+    }
+
     suspend fun dynamics(offset: String = ""): BiliResponse<DynamicFeedData> {
         return client.get(BiliApiConstants.DYNAMIC_FEED) {
             parameter("timezone_offset", -480)
             parameter("type", "all")
             if (offset.isNotBlank()) parameter("offset", offset)
+        }.body()
+    }
+
+    suspend fun userSpaceProfile(mid: Long): BiliResponse<UserSpaceProfile> {
+        val params = wbiSigner.sign(mapOf("mid" to mid))
+        return client.get(BiliApiConstants.USER_SPACE_PROFILE) {
+            params.forEach { (key, value) -> parameter(key, value) }
+        }.body()
+    }
+
+    suspend fun userRelationStat(mid: Long): BiliResponse<UserRelationStat> {
+        return client.get(BiliApiConstants.USER_RELATION_STAT) {
+            parameter("vmid", mid)
+        }.body()
+    }
+
+    suspend fun userSpaceVideos(mid: Long, page: Int = 1, pageSize: Int = 20): BiliResponse<UserVideoSearchData> {
+        val params = wbiSigner.sign(
+            mapOf(
+                "mid" to mid,
+                "pn" to page,
+                "ps" to pageSize,
+                "order" to "pubdate",
+            ),
+        )
+        return client.get(BiliApiConstants.USER_SPACE_VIDEOS) {
+            params.forEach { (key, value) -> parameter(key, value) }
         }.body()
     }
 
@@ -149,5 +205,24 @@ class BiliApiService(
                 append("csrf", csrf)
             },
         ).body()
+    }
+
+    private fun tvSignedParameters(extra: Map<String, String> = emptyMap()): Parameters {
+        val values = buildMap {
+            put("appkey", TvAppKey)
+            put("local_id", "0")
+            put("ts", kotlin.time.Clock.System.now().epochSeconds.toString())
+            putAll(extra)
+        }
+        val query = values.toSortedMap().entries.joinToString("&") { (key, value) -> "$key=$value" }
+        return Parameters.build {
+            values.forEach { (key, value) -> append(key, value) }
+            append("sign", md5Hex(query + TvAppSecret))
+        }
+    }
+
+    private companion object {
+        const val TvAppKey = "4409e2ce8ffd12b8"
+        const val TvAppSecret = "59b43e04ad6965f34319062b478f83dd"
     }
 }

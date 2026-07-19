@@ -26,6 +26,8 @@ val mainDestinations = listOf(
 
 sealed interface SecondaryDestination {
     data object Search : SecondaryDestination
+    data object Login : SecondaryDestination
 
     data class Video(val bvid: String) : SecondaryDestination
+    data class User(val mid: Long) : SecondaryDestination
 }
