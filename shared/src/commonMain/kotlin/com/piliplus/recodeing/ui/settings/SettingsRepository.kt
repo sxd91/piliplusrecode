@@ -1,6 +1,7 @@
 package com.piliplus.recodeing.ui.settings
 
 import androidx.compose.runtime.Composable
+import com.piliplus.recodeing.core.cdn.resolveCdnEndpoint
 import com.russhwolf.settings.Settings
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -15,8 +16,13 @@ class SettingsRepository(
 
     fun load(): SettingsUiState {
         val encoded = settings.getStringOrNull(SettingsStateKey) ?: return SettingsUiState()
-        return runCatching { json.decodeFromString<SettingsUiState>(encoded) }
+        val decoded = runCatching { json.decodeFromString<SettingsUiState>(encoded) }
             .getOrDefault(SettingsUiState())
+        val normalized = decoded.copy(
+            selectedCdnHost = resolveCdnEndpoint(decoded.selectedCdnHost).id,
+        )
+        if (normalized != decoded) save(normalized)
+        return normalized
     }
 
     fun save(state: SettingsUiState) {

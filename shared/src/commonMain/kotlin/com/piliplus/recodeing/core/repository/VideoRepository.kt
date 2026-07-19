@@ -1,8 +1,10 @@
 package com.piliplus.recodeing.core.repository
 
+import com.piliplus.recodeing.core.cdn.withCdn
 import com.piliplus.recodeing.core.model.RecommendItem
 import com.piliplus.recodeing.core.model.VideoDetail
 import com.piliplus.recodeing.core.model.VideoPlayUrl
+import com.piliplus.recodeing.core.model.VideoRelation
 import com.piliplus.recodeing.core.network.BiliApiService
 
 class VideoRepository(
@@ -12,6 +14,12 @@ class VideoRepository(
         val response = service.videoDetail(bvid)
         require(response.code == 0) { response.message.ifBlank { "视频详情加载失败" } }
         requireNotNull(response.data) { "视频详情为空" }
+    }
+
+    suspend fun relation(aid: Long): Result<VideoRelation> = runCatching {
+        val response = service.videoRelation(aid)
+        require(response.code == 0) { response.message.ifBlank { "互动状态加载失败" } }
+        requireNotNull(response.data) { "互动状态为空" }
     }
 
     suspend fun related(bvid: String): Result<List<RecommendItem>> = runCatching {
@@ -24,10 +32,15 @@ class VideoRepository(
         bvid: String,
         cid: Long,
         quality: Int = 80,
+        cdnEndpoint: String = "auto",
+        rewriteAudioCdn: Boolean = true,
     ): Result<VideoPlayUrl> = runCatching {
         val response = service.videoPlayUrl(bvid, cid, quality)
         require(response.code == 0) { response.message.ifBlank { "播放地址加载失败" } }
-        requireNotNull(response.data) { "播放地址为空" }
+        requireNotNull(response.data) { "播放地址为空" }.withCdn(
+            endpointValue = cdnEndpoint,
+            rewriteAudio = rewriteAudioCdn,
+        )
     }
 
     suspend fun like(aid: Long, like: Boolean, csrf: String): Result<Unit> = runCatching {

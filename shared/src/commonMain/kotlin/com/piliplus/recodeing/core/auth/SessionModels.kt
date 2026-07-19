@@ -128,13 +128,26 @@ class AccountRepository(
 
     fun storedCookies(): List<SessionCookie> = sessionStore.loadCookies()
 
-    fun switchAccount(id: String): Result<Unit> = runCatching {
+    suspend fun switchAccount(id: String): Result<AuthState> = runCatching {
         val account = _accounts.value.firstOrNull { it.id == id } ?: error("账号不存在")
+        val previousCookies = sessionStore.loadCookies()
+        val previousAccountId = sessionStore.currentAccountId()
+        val previousAuthState = _authState.value
+        val previousAccounts = _accounts.value
         sessionStore.saveCookies(account.cookies)
         sessionStore.setCurrentAccountId(account.id)
-        _authState.value = account.mid?.let {
-            AuthState.LoggedIn(it, account.name, account.avatarUrl)
-        } ?: AuthState.Anonymous
+        try {
+            refreshSession().getOrThrow().also { state ->
+                require(state is AuthState.LoggedIn && state.mid == account.mid) { "账号会话已失效" }
+            }
+        } catch (error: Throwable) {
+            sessionStore.saveCookies(previousCookies)
+            sessionStore.setCurrentAccountId(previousAccountId)
+            sessionStore.saveAccounts(previousAccounts)
+            _accounts.value = previousAccounts
+            _authState.value = previousAuthState
+            throw error
+        }
     }
 
     fun removeAccount(id: String) {

@@ -1,7 +1,11 @@
 package com.piliplus.recodeing.core.network
 
+import com.piliplus.recodeing.core.model.AddCommentData
 import com.piliplus.recodeing.core.model.BiliResponse
+import com.piliplus.recodeing.core.model.CommentData
+import com.piliplus.recodeing.core.model.CommentSort
 import com.piliplus.recodeing.core.model.DynamicFeedData
+import com.piliplus.recodeing.core.model.VideoRelation
 import com.piliplus.recodeing.core.model.NavUserInfo
 import com.piliplus.recodeing.core.model.PopularFeedData
 import com.piliplus.recodeing.core.model.RecommendFeedData
@@ -150,6 +154,69 @@ class BiliApiService(
         }.body()
     }
 
+    suspend fun videoRelation(aid: Long): BiliResponse<VideoRelation> {
+        return client.get(BiliApiConstants.VIDEO_RELATION) {
+            parameter("aid", aid)
+        }.body()
+    }
+
+    suspend fun comments(
+        aid: Long,
+        sort: CommentSort,
+        page: Int,
+        cursor: Long? = null,
+        pageSize: Int = 20,
+    ): BiliResponse<CommentData> = when (sort) {
+        CommentSort.Hot -> {
+            val params = wbiSigner.sign(
+                mapOf(
+                    "oid" to aid,
+                    "type" to 1,
+                    "mode" to 3,
+                    "ps" to pageSize,
+                    "plat" to 1,
+                    "web_location" to 1315875,
+                    "seek_rpid" to if (page == 1) 0 else null,
+                    "pagination_str" to "{\"offset\":\"${cursor ?: ""}\"}",
+                    "next" to cursor,
+                ),
+            )
+            client.get(BiliApiConstants.COMMENT_MAIN) {
+                params.forEach { (key, value) -> parameter(key, value) }
+            }.body()
+        }
+        else -> client.get(BiliApiConstants.COMMENT_LIST) {
+            parameter("oid", aid)
+            parameter("type", 1)
+            parameter("pn", page)
+            parameter("ps", pageSize)
+            parameter(
+                "sort",
+                when (sort) {
+                    CommentSort.Newest -> 0
+                    CommentSort.MostLiked -> 1
+                    CommentSort.MostReplies -> 2
+                    CommentSort.Hot -> error("热门评论使用 WBI 接口")
+                },
+            )
+        }.body()
+    }
+
+    suspend fun commentReplies(
+        aid: Long,
+        root: Long,
+        page: Int,
+        pageSize: Int = 20,
+    ): BiliResponse<CommentData> {
+        return client.get(BiliApiConstants.COMMENT_REPLIES) {
+            parameter("oid", aid)
+            parameter("type", 1)
+            parameter("root", root)
+            parameter("pn", page)
+            parameter("ps", pageSize)
+        }.body()
+    }
+
     suspend fun relatedVideos(bvid: String): BiliResponse<List<RecommendItem>> {
         return client.get(BiliApiConstants.VIDEO_RELATED) {
             parameter("bvid", bvid)
@@ -203,6 +270,63 @@ class BiliApiService(
                 append("multiply", count.coerceIn(1, 2).toString())
                 append("select_like", if (alsoLike) "1" else "0")
                 append("csrf", csrf)
+            },
+        ).body()
+    }
+
+    suspend fun reactToComment(
+        aid: Long,
+        rpid: Long,
+        like: Boolean,
+        csrf: String,
+    ): BiliResponse<kotlinx.serialization.json.JsonElement> {
+        return client.submitForm(
+            url = BiliApiConstants.COMMENT_ACTION,
+            formParameters = Parameters.build {
+                append("oid", aid.toString())
+                append("type", "1")
+                append("rpid", rpid.toString())
+                append("action", if (like) "1" else "0")
+                append("csrf", csrf)
+            },
+        ).body()
+    }
+
+    suspend fun hateComment(
+        aid: Long,
+        rpid: Long,
+        hate: Boolean,
+        csrf: String,
+    ): BiliResponse<kotlinx.serialization.json.JsonElement> {
+        return client.submitForm(
+            url = BiliApiConstants.COMMENT_HATE,
+            formParameters = Parameters.build {
+                append("oid", aid.toString())
+                append("type", "1")
+                append("rpid", rpid.toString())
+                append("action", if (hate) "1" else "0")
+                append("csrf", csrf)
+            },
+        ).body()
+    }
+
+    suspend fun addComment(
+        aid: Long,
+        message: String,
+        csrf: String,
+        root: Long? = null,
+        parent: Long? = null,
+    ): BiliResponse<AddCommentData> {
+        return client.submitForm(
+            url = BiliApiConstants.COMMENT_ADD,
+            formParameters = Parameters.build {
+                append("oid", aid.toString())
+                append("type", "1")
+                append("message", message)
+                append("plat", "1")
+                append("csrf", csrf)
+                root?.let { append("root", it.toString()) }
+                parent?.let { append("parent", it.toString()) }
             },
         ).body()
     }

@@ -16,6 +16,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -24,6 +26,7 @@ import com.piliplus.recodeing.core.auth.AuthState
 import com.kyant.backdrop.Backdrop
 import com.piliplus.recodeing.core.design.BiliAsyncImage
 import com.piliplus.recodeing.core.design.LiquidButton
+import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
@@ -37,6 +40,7 @@ fun ProfileScreen(
 ) {
     val authState by accountRepository.authState.collectAsState()
     val accounts by accountRepository.accounts.collectAsState()
+    val coroutineScope = rememberCoroutineScope()
     var accountMessage by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
 
     LaunchedEffect(accountRepository) {
@@ -136,8 +140,11 @@ fun ProfileScreen(
                             ) {
                                 LiquidButton(
                                     onClick = {
-                                        accountRepository.switchAccount(account.id).onFailure {
-                                            accountMessage = it.message ?: "账号切换失败"
+                                        coroutineScope.launch {
+                                            accountRepository.switchAccount(account.id).fold(
+                                                onSuccess = { accountMessage = null },
+                                                onFailure = { accountMessage = it.message ?: "账号切换失败" },
+                                            )
                                         }
                                     },
                                     backdrop = backdrop,

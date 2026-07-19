@@ -44,7 +44,9 @@ import com.piliplus.recodeing.core.design.LiquidButton
 import com.piliplus.recodeing.core.model.RecommendItem
 import com.piliplus.recodeing.core.model.VideoDetail
 import com.piliplus.recodeing.core.model.VideoPlayUrl
+import com.piliplus.recodeing.core.model.VideoRelation
 import com.piliplus.recodeing.core.network.BiliApiService
+import com.piliplus.recodeing.core.repository.CommentRepository
 import com.piliplus.recodeing.core.repository.VideoRepository
 import com.piliplus.recodeing.ui.settings.SettingsUiState
 import kotlinx.coroutines.Job
@@ -71,13 +73,22 @@ fun VideoDetailScreen(
     onPlay: (VideoPlayUrl) -> Unit,
     onVideoSelected: (String) -> Unit,
     onAuthorSelected: (Long) -> Unit = { },
-    viewModel: VideoDetailViewModel = viewModel(key = "video-$bvid-${accountRepository.hashCode()}") {
-        VideoDetailViewModel(
-            bvid = bvid,
-            repository = VideoRepository(
-                service = BiliApiService(cookieHeaderProvider = accountRepository::cookieHeader),
-            ),
-        )
+    viewModel: VideoDetailViewModel = run {
+        val service = BiliApiService(cookieHeaderProvider = accountRepository::cookieHeader)
+        val accountKey = accountRepository.authState.value.let { state ->
+            if (state is com.piliplus.recodeing.core.auth.AuthState.LoggedIn) state.mid else 0L
+        }
+        viewModel(
+            key = "video-$bvid-$accountKey-${settings.selectedCdnHost}-${settings.audioIgnoreCdn}",
+        ) {
+            VideoDetailViewModel(
+                bvid = bvid,
+                repository = VideoRepository(service = service),
+                commentRepository = CommentRepository(service = service),
+                cdnEndpoint = settings.selectedCdnHost,
+                rewriteAudioCdn = !settings.audioIgnoreCdn,
+            )
+        }
     },
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -93,7 +104,8 @@ fun VideoDetailScreen(
     LaunchedEffect(sections) {
         if (selectedSection !in sections) selectedSection = VideoDetailSection.Description
     }
-    val csrf = remember(accountRepository) {
+    val authState by accountRepository.authState.collectAsState()
+    val csrf = remember(authState, accountRepository) {
         accountRepository.storedCookies().firstOrNull { it.name == "bili_jct" }?.value.orEmpty()
     }
     VideoDetailContent(
@@ -115,6 +127,8 @@ fun VideoDetailScreen(
         onAuthorSelected = onAuthorSelected,
         onSelectPage = viewModel::selectPage,
         onSectionSelected = { selectedSection = it },
+        commentRepository = viewModel.commentRepository,
+        csrf = csrf,
         onLike = { viewModel.toggleLike(csrf) },
         onCoin = { viewModel.coin(csrf) },
         onRetry = viewModel::reload,
@@ -136,6 +150,8 @@ private fun VideoDetailContent(
     onAuthorSelected: (Long) -> Unit,
     onSelectPage: (Long) -> Unit,
     onSectionSelected: (VideoDetailSection) -> Unit,
+    commentRepository: CommentRepository,
+    csrf: String,
     onLike: () -> Unit,
     onCoin: () -> Unit,
     onRetry: () -> Unit,
@@ -188,6 +204,7 @@ private fun VideoDetailContent(
                         backdrop = backdrop,
                         actionInProgress = state.actionInProgress,
                         actionMessage = state.actionMessage,
+                        relation = state.relation,
                         isLoggedIn = isLoggedIn,
                         onPlay = onPlay,
                         onAuthorSelected = onAuthorSelected,
@@ -222,15 +239,13 @@ private fun VideoDetailContent(
                             Text(detail.desc.ifBlank { "暂无简介" })
                         }
                     }
-                    VideoDetailSection.Comments -> if (settings.showVideoComments) item {
-                        Card(Modifier.fillMaxWidth(), insideMargin = PaddingValues(18.dp)) {
-                            Text("评论数据模块正在接入 Bilibili 主楼与楼中楼接口")
-                            Text(
-                                "当前不会伪造评论内容。",
-                                modifier = Modifier.padding(top = 6.dp),
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                            )
-                        }
+                    VideoDetailSection.Comments -> if (settings.showVideoComments) {
+                        videoComments(
+                            aid = detail.aid,
+                            csrf = csrf,
+                            backdrop = backdrop,
+                            repository = commentRepository,
+                        )
                     }
                     VideoDetailSection.Related -> if (settings.showRelatedVideos) {
                         if (state.related.isEmpty()) {
@@ -262,6 +277,7 @@ private fun DetailHeader(
     backdrop: Backdrop,
     actionInProgress: Boolean,
     actionMessage: String?,
+    relation: VideoRelation?,
     isLoggedIn: Boolean,
     onPlay: (VideoPlayUrl) -> Unit,
     onAuthorSelected: (Long) -> Unit,
@@ -316,14 +332,23 @@ private fun DetailHeader(
                 enabled = playUrl != null,
                 tint = MiuixTheme.colorScheme.primary.copy(alpha = 0.18f),
             ) { Text(if (playUrl == null) "加载播放地址" else "播放") }
-            LiquidButton(onClick = onLike, backdrop = backdrop, enabled = isLoggedIn && !actionInProgress) {
-                Text("点赞")
+            LiquidButton(
+                onClick = onLike,
+                backdrop = backdrop,
+                enabled = isLoggedIn && relation != null && !actionInProgress,
+                tint = if (relation?.like == true) MiuixTheme.colorScheme.primary.copy(alpha = 0.18f) else Color.Unspecified,
+            ) {
+                Text(if (relation?.like == true) "已点赞" else "点赞")
             }
-            LiquidButton(onClick = onCoin, backdrop = backdrop, enabled = isLoggedIn && !actionInProgress) {
-                Text("投币")
+            LiquidButton(
+                onClick = onCoin,
+                backdrop = backdrop,
+                enabled = isLoggedIn && relation != null && !actionInProgress,
+            ) {
+                Text(if ((relation?.coin ?: 0) > 0) "已投 ${relation?.coin} 币" else "投币")
             }
             LiquidButton(onClick = { }, backdrop = backdrop, enabled = false) {
-                Text("收藏夹接入中")
+                Text(if (relation?.favorite == true) "已收藏" else "收藏夹接入中")
             }
         }
         AnimatedVisibility(visible = actionMessage != null, enter = fadeIn(), exit = fadeOut()) {
@@ -358,6 +383,7 @@ private enum class VideoDetailSection(val title: String) {
 data class VideoDetailUiState(
     val isLoading: Boolean = true,
     val detail: VideoDetail? = null,
+    val relation: VideoRelation? = null,
     val related: List<RecommendItem> = emptyList(),
     val playUrl: VideoPlayUrl? = null,
     val selectedCid: Long = 0,
@@ -369,10 +395,14 @@ data class VideoDetailUiState(
 class VideoDetailViewModel(
     private val bvid: String,
     private val repository: VideoRepository = VideoRepository(),
+    val commentRepository: CommentRepository = CommentRepository(BiliApiService()),
+    private val cdnEndpoint: String = "auto",
+    private val rewriteAudioCdn: Boolean = true,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(VideoDetailUiState())
     val uiState: StateFlow<VideoDetailUiState> = _uiState.asStateFlow()
     private var detailJob: Job? = null
+    private var relationJob: Job? = null
     private var relatedJob: Job? = null
     private var playUrlJob: Job? = null
 
@@ -382,9 +412,19 @@ class VideoDetailViewModel(
 
     fun reload() {
         detailJob?.cancel()
+        relationJob?.cancel()
         relatedJob?.cancel()
         playUrlJob?.cancel()
-        _uiState.update { it.copy(isLoading = true, error = null) }
+        _uiState.update {
+            it.copy(
+                isLoading = true,
+                relation = null,
+                related = emptyList(),
+                playUrl = null,
+                actionMessage = null,
+                error = null,
+            )
+        }
         load()
     }
 
@@ -396,15 +436,27 @@ class VideoDetailViewModel(
 
     fun toggleLike(csrf: String) {
         val detail = _uiState.value.detail ?: return
+        val targetLike = _uiState.value.relation?.like != true
         runAction(
-            name = "点赞",
-            request = { repository.like(detail.aid, like = true, csrf = csrf) },
+            name = if (targetLike) "点赞" else "取消点赞",
+            request = { repository.like(detail.aid, like = targetLike, csrf = csrf) },
+            onSuccess = {
+                _uiState.update { state ->
+                    state.copy(relation = (state.relation ?: VideoRelation()).copy(like = targetLike))
+                }
+            },
         )
     }
 
     fun coin(csrf: String) {
         val detail = _uiState.value.detail ?: return
-        runAction("投币", request = { repository.coin(detail.aid, count = 1, alsoLike = false, csrf = csrf) })
+        runAction(
+            "投币",
+            request = { repository.coin(detail.aid, count = 1, alsoLike = false, csrf = csrf) },
+            onSuccess = {
+                loadRelation(detail.aid)
+            },
+        )
     }
 
     private fun runAction(
@@ -434,6 +486,7 @@ class VideoDetailViewModel(
             repository.detail(bvid).fold(
                 onSuccess = { detail ->
                     _uiState.update { it.copy(isLoading = false, detail = detail, selectedCid = detail.cid, error = null) }
+                    loadRelation(detail.aid)
                     loadRelated()
                     loadPlayUrl(detail.cid)
                 },
@@ -441,6 +494,15 @@ class VideoDetailViewModel(
                     _uiState.update { it.copy(isLoading = false, error = error.message ?: "视频详情加载失败") }
                 },
             )
+        }
+    }
+
+    private fun loadRelation(aid: Long) {
+        relationJob?.cancel()
+        relationJob = viewModelScope.launch {
+            repository.relation(aid).onSuccess { relation ->
+                _uiState.update { it.copy(relation = relation) }
+            }
         }
     }
 
@@ -454,7 +516,12 @@ class VideoDetailViewModel(
     private fun loadPlayUrl(cid: Long) {
         playUrlJob?.cancel()
         playUrlJob = viewModelScope.launch {
-            repository.playUrl(bvid, cid).fold(
+            repository.playUrl(
+                bvid = bvid,
+                cid = cid,
+                cdnEndpoint = cdnEndpoint,
+                rewriteAudioCdn = rewriteAudioCdn,
+            ).fold(
                 onSuccess = { url ->
                     _uiState.update { state -> if (state.selectedCid == cid) state.copy(playUrl = url) else state }
                 },

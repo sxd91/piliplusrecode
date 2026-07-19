@@ -76,7 +76,6 @@ fun SearchScreen(
                         expanded = true,
                         onExpandedChange = { },
                         label = state.defaultKeyword,
-                        color = Color.Transparent,
                     )
                 }
             }

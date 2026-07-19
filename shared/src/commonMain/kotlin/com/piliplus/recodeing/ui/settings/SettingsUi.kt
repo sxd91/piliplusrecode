@@ -22,12 +22,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.kyant.backdrop.Backdrop
 import com.piliplus.recodeing.core.cdn.CdnProbeResult
 import com.piliplus.recodeing.core.cdn.builtInCdnEndpoints
 import com.piliplus.recodeing.core.cdn.probeCdnEndpoint
+import com.piliplus.recodeing.core.cdn.resolveCdnEndpoint
 import com.piliplus.recodeing.core.design.GlassBackButton
 import com.piliplus.recodeing.core.design.GlassSurface
 import kotlinx.coroutines.launch
@@ -91,7 +91,6 @@ fun SettingsPage(
                             expanded = true,
                             onExpandedChange = { },
                             label = "搜索设置",
-                            color = Color.Transparent,
                         )
                     }
                 }
@@ -176,7 +175,11 @@ private fun LazyListScope.categoryContent(
             settingsGroup("解码与网络") {
                 settingSwitch("硬件解码", null, state.hardwareDecode) { update { s -> s.copy(hardwareDecode = it) } }
                 settingSwitch("未登录允许 1080P", null, state.allow1080pAnonymous) { update { s -> s.copy(allow1080pAnonymous = it) } }
-                ArrowPreference("CDN 配置", summary = state.selectedCdnHost, onClick = onCdnConfig)
+                ArrowPreference(
+                    "CDN 配置",
+                    summary = resolveCdnEndpoint(state.selectedCdnHost).name,
+                    onClick = onCdnConfig,
+                )
                 settingSwitch("CDN 测速", "手动检测内置线路延迟", state.cdnSpeedTest) { update { s -> s.copy(cdnSpeedTest = it) } }
                 settingSwitch("音频不跟随 CDN", null, state.audioIgnoreCdn) { update { s -> s.copy(audioIgnoreCdn = it) } }
             }
@@ -274,9 +277,9 @@ private fun CdnConfigurationDialog(
     OverlayDialog(
         show = show,
         title = "CDN 配置",
-        summary = "选择内置 Bilibili CDN，并手动检测 TCP 443 连接延迟。播放时仍保留原始地址作为回退。",
+        summary = "选择内置 Bilibili CDN，并手动检测 TCP 443 连接延迟。媒体地址会保留原始候选，播放器自动重试仍在完善。",
         onDismissRequest = onDismiss,
-        maxWidth = 620.dp,
+        modifier = Modifier.widthIn(max = 620.dp),
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             builtInCdnEndpoints.forEach { endpoint ->
@@ -287,9 +290,9 @@ private fun CdnConfigurationDialog(
                         append(endpoint.host ?: "由 Bilibili 自动选择")
                         result?.latencyMillis?.let { append(" · ").append(it).append(" ms") }
                         result?.error?.let { append(" · ").append(it) }
-                        if (selectedHost == endpoint.name) append(" · 当前")
+                        if (resolveCdnEndpoint(selectedHost).id == endpoint.id) append(" · 当前")
                     },
-                    onClick = { onSelectedHost(endpoint.name) },
+                    onClick = { onSelectedHost(endpoint.id) },
                 )
             }
             Row(
