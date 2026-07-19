@@ -36,7 +36,7 @@ fun GlassSurface(
 ) {
     val shape = RoundedCornerShape(cornerRadius)
     val fallbackColor = MiuixTheme.colorScheme.surfaceContainer
-    val glassModifier = if (enabled) {
+    val glassModifier = if (enabled && platformSupportsLiquidGlass()) {
         Modifier.drawBackdrop(
             backdrop = backdrop,
             shape = { shape },

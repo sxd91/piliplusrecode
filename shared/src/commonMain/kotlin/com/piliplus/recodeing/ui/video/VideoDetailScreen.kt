@@ -4,25 +4,31 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.piliplus.recodeing.core.design.BiliAsyncImage
 import com.piliplus.recodeing.core.model.RecommendItem
 import com.piliplus.recodeing.core.model.VideoDetail
 import com.piliplus.recodeing.core.model.VideoPlayUrl
@@ -153,16 +159,38 @@ private fun DetailHeader(
     onPlay: (VideoPlayUrl) -> Unit,
 ) {
     Card(Modifier.fillMaxWidth(), insideMargin = PaddingValues(20.dp)) {
-        Text(detail.title, style = MiuixTheme.textStyles.title2)
-        Text(
-            text = buildString {
-                append(detail.owner?.name ?: "未知 UP 主")
-                detail.stat?.view?.let { append(" · 播放 ").append(it) }
-                detail.stat?.danmaku?.let { append(" · 弹幕 ").append(it) }
-            },
-            modifier = Modifier.padding(top = 8.dp),
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+        BiliAsyncImage(
+            url = detail.pic,
+            contentDescription = detail.title,
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(16f / 9f)
+                .clip(RoundedCornerShape(14.dp)),
         )
+        Text(
+            detail.title,
+            modifier = Modifier.padding(top = 14.dp),
+            style = MiuixTheme.textStyles.title2,
+        )
+        Row(
+            modifier = Modifier.padding(top = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            BiliAsyncImage(
+                url = detail.owner?.face,
+                contentDescription = detail.owner?.name,
+                modifier = Modifier.size(40.dp).clip(CircleShape),
+            )
+            Text(
+                text = buildString {
+                    append(detail.owner?.name ?: "未知 UP 主")
+                    detail.stat?.view?.let { append(" · 播放 ").append(it) }
+                    detail.stat?.danmaku?.let { append(" · 弹幕 ").append(it) }
+                },
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            )
+        }
         Row(
             modifier = Modifier.padding(top = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),

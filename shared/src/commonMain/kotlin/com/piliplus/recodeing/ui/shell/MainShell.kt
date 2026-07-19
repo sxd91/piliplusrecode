@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -29,6 +28,7 @@ import com.kyant.backdrop.effects.vibrancy
 import com.piliplus.recodeing.core.auth.AccountRepository
 import com.piliplus.recodeing.core.auth.rememberAccountRepository
 import com.piliplus.recodeing.core.design.PiliGlassDefaults
+import com.piliplus.recodeing.core.design.platformSupportsLiquidGlass
 import com.piliplus.recodeing.ui.dynamics.DynamicsScreen
 import com.piliplus.recodeing.ui.home.HomeScreen
 import com.piliplus.recodeing.ui.profile.ProfileScreen
@@ -80,7 +80,7 @@ fun MainShell(
             onVideoBack = { selectedVideoId = null },
             accountRepository = accountRepository,
             settingsStateHolder = settingsStateHolder,
-            glassEnabled = settings.glassEnabled,
+            glassEnabled = settings.glassEnabled && platformSupportsLiquidGlass(),
             floatingBottomBar = settings.floatingBottomBar,
         )
     }
@@ -112,21 +112,20 @@ private fun ShellWithBackdrop(
     glassEnabled: Boolean,
     floatingBottomBar: Boolean,
 ) {
+    val useGlass = glassEnabled && platformSupportsLiquidGlass()
     val backgroundColor = MiuixTheme.colorScheme.background
-    val backdrop = key(navigationMode) {
-        rememberLayerBackdrop(
-            onDraw = {
-                drawRect(backgroundColor)
-                drawContent()
-            },
-        )
-    }
+    val backdrop = rememberLayerBackdrop(
+        onDraw = {
+            drawRect(backgroundColor)
+            drawContent()
+        },
+    )
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(backgroundColor)
-            .layerBackdrop(backdrop),
+            .then(if (useGlass) Modifier.layerBackdrop(backdrop) else Modifier),
     ) {
         when (navigationMode) {
             WindowNavigationMode.CompactBottomBar -> CompactShell(
@@ -138,7 +137,7 @@ private fun ShellWithBackdrop(
                 selectedVideoId = selectedVideoId,
                 onVideoSelected = onVideoSelected,
                 onVideoBack = onVideoBack,
-                glassEnabled = glassEnabled,
+                glassEnabled = useGlass,
                 floatingBottomBar = floatingBottomBar,
             )
 
@@ -169,7 +168,7 @@ private fun CompactShell(
     glassEnabled: Boolean,
     floatingBottomBar: Boolean,
 ) {
-    val scrollBehavior = key(current) { MiuixScrollBehavior() }
+    val scrollBehavior = MiuixScrollBehavior()
     val glassNavigationColor = MiuixTheme.colorScheme.surface.copy(alpha = PiliGlassDefaults.SurfaceAlpha)
 
     Scaffold(
@@ -239,7 +238,7 @@ private fun RailShell(
     settingsStateHolder: SettingsStateHolder,
     backdrop: Backdrop,
 ) {
-    val scrollBehavior = key(current) { MiuixScrollBehavior() }
+    val scrollBehavior = MiuixScrollBehavior()
 
     Scaffold(
         modifier = Modifier
@@ -288,7 +287,7 @@ private fun ShellTopBar(
     TopAppBar(
         title = current.title,
         largeTitle = when (current) {
-            AppDestination.Home -> "liquidreode"
+            AppDestination.Home -> "reliqliquid"
             AppDestination.Dynamics -> "动态"
             AppDestination.Profile -> "个人中心"
             AppDestination.Settings -> "设置"

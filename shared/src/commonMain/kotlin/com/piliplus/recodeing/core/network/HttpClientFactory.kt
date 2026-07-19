@@ -41,7 +41,7 @@ fun createBiliHttpClient(cookieHeaderProvider: () -> String = { "" }): HttpClien
         socketTimeoutMillis = 30_000
     }
     install(UserAgent) {
-        agent = "Mozilla/5.0 liquidreode/0.1 ComposeMultiplatform"
+        agent = "Mozilla/5.0 reliqliquid/0.1 ComposeMultiplatform"
     }
     install(Logging) {
         level = LogLevel.INFO

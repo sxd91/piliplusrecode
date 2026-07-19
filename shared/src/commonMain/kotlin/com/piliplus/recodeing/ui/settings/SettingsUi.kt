@@ -242,7 +242,7 @@ private fun LazyListScope.categoryContent(
             ArrowPreference("恢复设置", summary = "替换本机设置，需要确认", onClick = {})
         }
 
-        SettingsCategory.About -> settingsGroup("关于 liquidreode") {
+        SettingsCategory.About -> settingsGroup("关于 reliqliquid") {
             ArrowPreference("版本", summary = "0.1.0", onClick = {})
             ArrowPreference("开发者", summary = "SXD", onClick = {})
             ArrowPreference("日志", summary = "查看、复制、清除与报告问题", onClick = {})

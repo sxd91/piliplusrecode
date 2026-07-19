@@ -2,11 +2,18 @@ package com.piliplus.recodeing.ui.dynamics
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
@@ -22,6 +29,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.kyant.backdrop.Backdrop
 import com.piliplus.recodeing.core.auth.AccountRepository
 import com.piliplus.recodeing.core.auth.AuthState
+import com.piliplus.recodeing.core.design.BiliAsyncImage
 import com.piliplus.recodeing.core.design.LiquidButton
 import com.piliplus.recodeing.core.model.DynamicItem
 import com.piliplus.recodeing.core.network.BiliApiService
@@ -89,9 +97,35 @@ private fun DynamicCard(item: DynamicItem, onVideoSelected: (String) -> Unit) {
         insideMargin = PaddingValues(18.dp),
         onClick = { archive?.bvid?.takeIf(String::isNotBlank)?.let(onVideoSelected) },
     ) {
-        Text(item.modules?.author?.name.orEmpty().ifBlank { "Bilibili 用户" }, style = MiuixTheme.textStyles.title3)
-        item.modules?.author?.publishTime?.takeIf(String::isNotBlank)?.let {
-            Text(it, modifier = Modifier.padding(top = 4.dp), color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            BiliAsyncImage(
+                url = item.modules?.author?.face,
+                contentDescription = item.modules?.author?.name,
+                modifier = Modifier.size(42.dp).clip(CircleShape),
+            )
+            Column {
+                Text(
+                    item.modules?.author?.name.orEmpty().ifBlank { "Bilibili 用户" },
+                    style = MiuixTheme.textStyles.title3,
+                )
+                item.modules?.author?.publishTime?.takeIf(String::isNotBlank)?.let {
+                    Text(it, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+                }
+            }
+        }
+        archive?.cover?.takeIf(String::isNotBlank)?.let { cover ->
+            BiliAsyncImage(
+                url = cover,
+                contentDescription = archive.title,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp)
+                    .aspectRatio(16f / 9f)
+                    .clip(RoundedCornerShape(14.dp)),
+            )
         }
         Text(
             (archive?.title ?: item.modules?.dynamic?.desc?.text.orEmpty()).ifBlank { "动态内容" },

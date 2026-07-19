@@ -25,12 +25,23 @@ compose.desktop {
         mainClass = "com.piliplus.recodeing.MainKt"
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Deb)
-            packageName = "liquidreode"
+            packageName = "reliqliquid-debug"
             packageVersion = "0.1.0"
             vendor = "SXD"
-            modules("java.desktop", "java.logging", "java.naming", "java.net.http", "java.prefs", "java.sql")
+            modules(
+                "java.desktop",
+                "java.logging",
+                "java.management",
+                "java.naming",
+                "java.net.http",
+                "java.prefs",
+                "java.security.jgss",
+                "java.sql",
+                "jdk.crypto.ec",
+                "jdk.unsupported",
+            )
             windows {
-                menuGroup = "liquidreode"
+                menuGroup = "reliqliquid"
                 upgradeUuid = "B8B21B6A-0AD8-44A7-9016-A9256ED02652"
             }
         }

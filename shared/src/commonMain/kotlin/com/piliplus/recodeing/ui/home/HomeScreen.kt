@@ -4,12 +4,16 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import com.kyant.backdrop.Backdrop
+import com.piliplus.recodeing.core.design.BiliAsyncImage
 import com.piliplus.recodeing.core.design.LiquidButton
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -244,8 +248,17 @@ private fun VideoCard(
         showIndication = true,
         onClick = onClick,
     ) {
+        BiliAsyncImage(
+            url = item.pic,
+            contentDescription = item.title,
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(16f / 9f)
+                .clip(RoundedCornerShape(14.dp)),
+        )
         Text(
             text = item.title.ifBlank { "未命名视频" },
+            modifier = Modifier.padding(top = 12.dp),
             style = MiuixTheme.textStyles.title3,
         )
         Text(
@@ -279,8 +292,17 @@ private fun SearchResultCard(
         showIndication = true,
         onClick = onClick,
     ) {
+        BiliAsyncImage(
+            url = item.pic ?: item.cover,
+            contentDescription = item.title.cleanSearchText(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(16f / 9f)
+                .clip(RoundedCornerShape(14.dp)),
+        )
         Text(
             text = item.title.cleanSearchText().ifBlank { "未命名结果" },
+            modifier = Modifier.padding(top = 12.dp),
             style = MiuixTheme.textStyles.title3,
         )
         Text(

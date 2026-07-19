@@ -14,10 +14,17 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.sxd.liquidreode"
+        applicationId = "com.sxd.reliqliquid"
         minSdk = 23
         targetSdk = 37
         versionCode = 1
         versionName = "0.1.0"
+    }
+
+    buildTypes {
+        getByName("debug") {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
     }
 }

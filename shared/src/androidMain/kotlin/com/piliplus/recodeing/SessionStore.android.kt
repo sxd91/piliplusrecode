@@ -16,12 +16,12 @@ import javax.crypto.spec.GCMParameterSpec
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-private const val PreferencesName = "liquidreode_session"
+private const val PreferencesName = "reliqliquid_session"
 private const val CookieKey = "cookies"
 private const val AccountsKey = "accounts"
 private const val CurrentAccountKey = "current_account"
 private const val KeyStoreType = "AndroidKeyStore"
-private const val KeyAlias = "liquidreode_session_key"
+private const val KeyAlias = "reliqliquid_session_key"
 private const val Transformation = "AES/GCM/NoPadding"
 
 actual class SessionStore internal constructor(

@@ -11,7 +11,7 @@ actual fun rememberSettingsRepository(): SettingsRepository {
     return remember(context) {
         SettingsRepository(
             SharedPreferencesSettings(
-                context.getSharedPreferences("liquidreode_settings", 0),
+                context.getSharedPreferences("reliqliquid_settings", 0),
             ),
         )
     }

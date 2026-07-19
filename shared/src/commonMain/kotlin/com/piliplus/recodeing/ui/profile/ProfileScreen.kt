@@ -7,7 +7,10 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -23,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import com.piliplus.recodeing.core.auth.AccountRepository
 import com.piliplus.recodeing.core.auth.AuthState
 import com.kyant.backdrop.Backdrop
+import com.piliplus.recodeing.core.design.BiliAsyncImage
 import com.piliplus.recodeing.core.design.LiquidButton
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Card
@@ -128,7 +132,16 @@ fun ProfileScreen(
                             }
                         }
                         is AuthState.LoggedIn -> {
-                            Text(state.name, style = MiuixTheme.textStyles.title3)
+                            BiliAsyncImage(
+                                url = state.avatarUrl,
+                                contentDescription = state.name,
+                                modifier = Modifier.size(72.dp).clip(CircleShape),
+                            )
+                            Text(
+                                state.name,
+                                modifier = Modifier.padding(top = 12.dp),
+                                style = MiuixTheme.textStyles.title3,
+                            )
                             Text(
                                 "UID ${state.mid}",
                                 modifier = Modifier.padding(top = 8.dp),

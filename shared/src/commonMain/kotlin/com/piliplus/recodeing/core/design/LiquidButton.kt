@@ -5,6 +5,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -57,6 +58,8 @@ fun LiquidButton(
     tint: Color = Color.Unspecified,
     content: @Composable RowScope.() -> Unit,
 ) {
+    val useGlass = platformSupportsLiquidGlass()
+    val useAdaptiveLuminance = useGlass && adaptiveLuminance
     val scope = rememberCoroutineScope()
     val pressProgress = remember { Animatable(0f) }
     val pointerOffset = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
@@ -64,8 +67,8 @@ fun LiquidButton(
     val luminance = remember { Animatable(0.5f) }
     val contentColor = remember { ColorAnimatable(Color.White) }
 
-    LaunchedEffect(sampledLayer, adaptiveLuminance) {
-        if (!adaptiveLuminance) return@LaunchedEffect
+    LaunchedEffect(sampledLayer, useAdaptiveLuminance) {
+        if (!useAdaptiveLuminance) return@LaunchedEffect
         val pixels = IntArray(25)
         while (isActive) {
             val bitmap = runCatching { sampledLayer.toImageBitmap() }.getOrNull()
@@ -90,58 +93,94 @@ fun LiquidButton(
         }
     }
 
+    val visualModifier = if (useGlass) {
+        Modifier.drawBackdrop(
+            backdrop = backdrop,
+            shape = { RoundedCornerShape(percent = 50) },
+            effects = {
+                val adjustedLuminance = (luminance.value * 2f - 1f).let { sign(it) * it * it }
+                if (useAdaptiveLuminance) {
+                    colorControls(
+                        brightness = if (adjustedLuminance > 0f) {
+                            lerp(0.08f, 0.38f, adjustedLuminance)
+                        } else {
+                            lerp(0.08f, -0.16f, -adjustedLuminance)
+                        },
+                        contrast = if (adjustedLuminance > 0f) lerp(1f, 0.35f, adjustedLuminance) else 1f,
+                        saturation = 1.45f,
+                    )
+                }
+                blur(4.dp.toPx())
+                lens(12.dp.toPx(), 24.dp.toPx(), depthEffect = true)
+            },
+            highlight = { Highlight.Default.copy(alpha = 0.65f + pressProgress.value * 0.35f) },
+            layerBlock = {
+                val progress = pressProgress.value
+                val width = size.width.coerceAtLeast(1f)
+                val height = size.height.coerceAtLeast(1f)
+                val offset = pointerOffset.value
+                val maxOffset = size.minDimension.coerceAtLeast(1f)
+                translationX = maxOffset * tanh(0.05f * offset.x / maxOffset)
+                translationY = maxOffset * tanh(0.05f * offset.y / maxOffset)
+                val angle = atan2(offset.y, offset.x)
+                val maxDimension = size.maxDimension.coerceAtLeast(1f)
+                val baseScale = lerp(1f, 1f + 4.dp.toPx() / height, progress)
+                val dragScale = 4.dp.toPx() / height
+                scaleX = baseScale + dragScale * abs(cos(angle) * offset.x / maxDimension) *
+                    (width / height).fastCoerceAtMost(1f)
+                scaleY = baseScale + dragScale * abs(sin(angle) * offset.y / maxDimension) *
+                    (height / width).fastCoerceAtMost(1f)
+            },
+            onDrawBackdrop = { drawBackdrop ->
+                drawBackdrop()
+                if (useAdaptiveLuminance) sampledLayer.record { drawBackdrop() }
+            },
+            onDrawSurface = {
+                if (tint != Color.Unspecified) {
+                    drawRect(tint, blendMode = BlendMode.Hue)
+                    drawRect(tint.copy(alpha = 0.64f))
+                } else {
+                    drawRect(Color.White.copy(alpha = 0.08f))
+                }
+            },
+        )
+    } else {
+        Modifier.background(
+            color = if (tint != Color.Unspecified) tint else Color.White.copy(alpha = 0.10f),
+            shape = RoundedCornerShape(percent = 50),
+        )
+    }
+    val interactionModifier = if (useGlass) {
+        Modifier.pointerInput(enabled, scope) {
+            if (!enabled) return@pointerInput
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                val origin = down.position
+                var pointerUpdateJob: Job? = null
+                scope.launch { pressProgress.animateTo(1f, spring(0.5f, 300f)) }
+                scope.launch { pointerOffset.snapTo(Offset.Zero) }
+                do {
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                    val change = event.changes.firstOrNull { it.id == down.id }
+                    change?.let { pointerChange ->
+                        pointerUpdateJob?.cancel()
+                        pointerUpdateJob = scope.launch {
+                            pointerOffset.snapTo(pointerChange.position - origin)
+                        }
+                    }
+                } while (change?.pressed == true)
+                pointerUpdateJob?.cancel()
+                scope.launch { pressProgress.animateTo(0f, spring(0.5f, 300f)) }
+                scope.launch { pointerOffset.animateTo(Offset.Zero, spring(0.5f, 300f)) }
+            }
+        }
+    } else {
+        Modifier
+    }
+
     Row(
         modifier = modifier
-            .drawBackdrop(
-                backdrop = backdrop,
-                shape = { RoundedCornerShape(percent = 50) },
-                effects = {
-                    val adjustedLuminance = (luminance.value * 2f - 1f).let { sign(it) * it * it }
-                    if (adaptiveLuminance) {
-                        colorControls(
-                            brightness = if (adjustedLuminance > 0f) {
-                                lerp(0.08f, 0.38f, adjustedLuminance)
-                            } else {
-                                lerp(0.08f, -0.16f, -adjustedLuminance)
-                            },
-                            contrast = if (adjustedLuminance > 0f) lerp(1f, 0.35f, adjustedLuminance) else 1f,
-                            saturation = 1.45f,
-                        )
-                    }
-                    blur(4.dp.toPx())
-                    lens(12.dp.toPx(), 24.dp.toPx(), depthEffect = true)
-                },
-                highlight = { Highlight.Default.copy(alpha = 0.65f + pressProgress.value * 0.35f) },
-                layerBlock = {
-                    val progress = pressProgress.value
-                    val width = size.width.coerceAtLeast(1f)
-                    val height = size.height.coerceAtLeast(1f)
-                    val offset = pointerOffset.value
-                    val maxOffset = size.minDimension.coerceAtLeast(1f)
-                    translationX = maxOffset * tanh(0.05f * offset.x / maxOffset)
-                    translationY = maxOffset * tanh(0.05f * offset.y / maxOffset)
-                    val angle = atan2(offset.y, offset.x)
-                    val maxDimension = size.maxDimension.coerceAtLeast(1f)
-                    val baseScale = lerp(1f, 1f + 4.dp.toPx() / height, progress)
-                    val dragScale = 4.dp.toPx() / height
-                    scaleX = baseScale + dragScale * abs(cos(angle) * offset.x / maxDimension) *
-                        (width / height).fastCoerceAtMost(1f)
-                    scaleY = baseScale + dragScale * abs(sin(angle) * offset.y / maxDimension) *
-                        (height / width).fastCoerceAtMost(1f)
-                },
-                onDrawBackdrop = { drawBackdrop ->
-                    drawBackdrop()
-                    if (adaptiveLuminance) sampledLayer.record { drawBackdrop() }
-                },
-                onDrawSurface = {
-                    if (tint != Color.Unspecified) {
-                        drawRect(tint, blendMode = BlendMode.Hue)
-                        drawRect(tint.copy(alpha = 0.64f))
-                    } else {
-                        drawRect(Color.White.copy(alpha = 0.08f))
-                    }
-                },
-            )
+            .then(visualModifier)
             .clickable(
                 enabled = enabled,
                 interactionSource = null,
@@ -149,29 +188,7 @@ fun LiquidButton(
                 role = Role.Button,
                 onClick = onClick,
             )
-            .pointerInput(enabled, scope) {
-                if (!enabled) return@pointerInput
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                    val origin = down.position
-                    var pointerUpdateJob: Job? = null
-                    scope.launch { pressProgress.animateTo(1f, spring(0.5f, 300f)) }
-                    scope.launch { pointerOffset.snapTo(Offset.Zero) }
-                    do {
-                        val event = awaitPointerEvent(PointerEventPass.Initial)
-                        val change = event.changes.firstOrNull { it.id == down.id }
-                        change?.let { pointerChange ->
-                            pointerUpdateJob?.cancel()
-                            pointerUpdateJob = scope.launch {
-                                pointerOffset.snapTo(pointerChange.position - origin)
-                            }
-                        }
-                    } while (change?.pressed == true)
-                    pointerUpdateJob?.cancel()
-                    scope.launch { pressProgress.animateTo(0f, spring(0.5f, 300f)) }
-                    scope.launch { pointerOffset.animateTo(Offset.Zero, spring(0.5f, 300f)) }
-                }
-            }
+            .then(interactionModifier)
             .height(48.dp)
             .padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),

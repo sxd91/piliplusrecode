@@ -36,7 +36,7 @@ actual fun PlatformVideoPlayer(
     val playerKey = directUrl ?: videoTrack?.baseUrl ?: return
     val player = remember(playerKey, audioTrack?.baseUrl) {
         val dataSourceFactory = DefaultHttpDataSource.Factory()
-            .setUserAgent("Mozilla/5.0 liquidreode")
+            .setUserAgent("Mozilla/5.0 reliqliquid")
             .setDefaultRequestProperties(mapOf("Referer" to "https://www.bilibili.com/"))
         ExoPlayer.Builder(context).build().apply {
             if (directUrl != null) {

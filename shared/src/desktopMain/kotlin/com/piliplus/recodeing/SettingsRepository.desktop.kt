@@ -9,7 +9,7 @@ import java.util.prefs.Preferences
 actual fun rememberSettingsRepository(): SettingsRepository = remember {
     SettingsRepository(
         PreferencesSettings(
-            Preferences.userRoot().node("com/sxd/liquidreode"),
+            Preferences.userRoot().node("com/sxd/reliqliquid"),
         ),
     )
 }

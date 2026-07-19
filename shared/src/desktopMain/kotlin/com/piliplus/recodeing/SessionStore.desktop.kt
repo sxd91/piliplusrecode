@@ -12,7 +12,7 @@ import javax.crypto.spec.SecretKeySpec
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-private const val PreferencesNode = "com/sxd/liquidreode/session"
+private const val PreferencesNode = "com/sxd/reliqliquid/session"
 private const val CookieKey = "cookies"
 private const val AccountsKey = "accounts"
 private const val CurrentAccountKey = "current_account"

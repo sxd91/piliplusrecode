@@ -20,7 +20,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "liquidreode"
+rootProject.name = "reliqliquid"
 
 include(":shared")
 include(":androidApp")
