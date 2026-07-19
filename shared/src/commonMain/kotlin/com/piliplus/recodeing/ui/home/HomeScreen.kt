@@ -8,13 +8,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.ui.graphics.Color
 import com.kyant.backdrop.Backdrop
 import com.piliplus.recodeing.core.design.LiquidButton
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Search
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -28,12 +27,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.piliplus.recodeing.core.auth.rememberUrlOpener
 import com.piliplus.recodeing.core.model.RecommendItem
 import com.piliplus.recodeing.core.model.SearchResultItem
 import top.yukonga.miuix.kmp.basic.BasicComponent
-import top.yukonga.miuix.kmp.basic.Button
-import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.InputField
@@ -48,6 +44,7 @@ private val HomeContentMaxWidth = 680.dp
 @Composable
 fun HomeScreen(
     backdrop: Backdrop,
+    onVideoSelected: (String) -> Unit,
     viewModel: HomeViewModel = viewModel { HomeViewModel() },
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -148,10 +145,10 @@ fun HomeScreen(
                 ) {
                     Text("加载失败", style = MiuixTheme.textStyles.title3)
                     Text(message, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
-                    Button(
+                    LiquidButton(
                         onClick = viewModel::refresh,
+                        backdrop = backdrop,
                         modifier = Modifier.padding(top = 12.dp),
-                        colors = ButtonDefaults.buttonColorsPrimary(),
                     ) {
                         Text("重试")
                     }
@@ -167,12 +164,11 @@ fun HomeScreen(
                     HomeTab.Recommend,
                     HomeTab.Popular,
                     -> items(feedItems) { item ->
-                        VideoCard(item) { urlOpener.open(item.uri ?: "https://www.bilibili.com/video/${item.bvid.orEmpty()}") }
+                        VideoCard(item) { item.bvid?.let(onVideoSelected) }
                     }
                     HomeTab.Search -> items(state.searchResults) { item ->
                         SearchResultCard(item) {
-                            val target = item.arcurl ?: item.bvid?.let { "https://www.bilibili.com/video/$it" }
-                            if (target != null) urlOpener.open(target)
+                            item.bvid?.let(onVideoSelected)
                         }
                     }
                 }

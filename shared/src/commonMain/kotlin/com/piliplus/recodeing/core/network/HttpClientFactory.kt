@@ -20,7 +20,8 @@ import kotlinx.serialization.json.Json
 
 expect fun platformHttpClientEngine(): HttpClientEngineFactory<*>
 
-fun createBiliHttpClient(): HttpClient = HttpClient(platformHttpClientEngine()) {
+fun createBiliHttpClient(cookieHeaderProvider: () -> String = { "" }): HttpClient =
+    HttpClient(platformHttpClientEngine()) {
     install(ContentNegotiation) {
         json(
             Json {
@@ -59,5 +60,8 @@ fun createBiliHttpClient(): HttpClient = HttpClient(platformHttpClientEngine()) 
         accept(ContentType.Application.Json)
         header(HttpHeaders.AcceptLanguage, "zh-CN,zh;q=0.9")
         header(HttpHeaders.Referrer, BiliApiConstants.WEB_BASE_URL)
+        cookieHeaderProvider().takeIf { it.isNotBlank() }?.let { cookieHeader ->
+            header(HttpHeaders.Cookie, cookieHeader)
+        }
     }
 }

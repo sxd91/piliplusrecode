@@ -16,7 +16,8 @@ import io.ktor.client.request.get
 import io.ktor.client.request.parameter
 
 class BiliApiService(
-    private val client: HttpClient = createBiliHttpClient(),
+    cookieHeaderProvider: () -> String = { "" },
+    private val client: HttpClient = createBiliHttpClient(cookieHeaderProvider),
     private val wbiSigner: WbiSigner = WbiSigner(client),
 ) {
     suspend fun recommendations(pageSize: Int, freshIndex: Int): BiliResponse<RecommendFeedData> {

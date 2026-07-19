@@ -13,15 +13,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.piliplus.recodeing.core.auth.AccountRepository
 import com.piliplus.recodeing.core.auth.AuthState
 import com.kyant.backdrop.Backdrop
-import com.piliplus.recodeing.core.auth.rememberUrlOpener
 import com.piliplus.recodeing.core.design.LiquidButton
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.InputField
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -31,8 +34,10 @@ fun ProfileScreen(
     accountRepository: AccountRepository,
     backdrop: Backdrop,
 ) {
-    val urlOpener = rememberUrlOpener()
     val authState by accountRepository.authState.collectAsState()
+    var cookieInput by remember { mutableStateOf("") }
+    var cookieError by remember { mutableStateOf<String?>(null) }
+    var cookieImporting by remember { mutableStateOf(false) }
 
     LaunchedEffect(accountRepository) {
         accountRepository.refreshSession()
@@ -59,27 +64,53 @@ fun ProfileScreen(
                         AuthState.Anonymous -> {
                             Text("未登录", style = MiuixTheme.textStyles.title3)
                             Text(
-                                "登录与安全验证将由 Bilibili 官方页面完成。",
+                                "可在应用内导入浏览器复制的 Bilibili Cookie；密码、短信和扫码登录仍需完成官方风控流程。",
                                 modifier = Modifier.padding(top = 8.dp),
                                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                             )
+                            InputField(
+                                query = cookieInput,
+                                onQueryChange = {
+                                    cookieInput = it
+                                    cookieError = null
+                                },
+                                label = "粘贴 Cookie，如 SESSDATA=...; bili_jct=...",
+                                modifier = Modifier.padding(top = 16.dp),
+                            )
+                            cookieError?.let { message ->
+                                Text(
+                                    message,
+                                    modifier = Modifier.padding(top = 8.dp),
+                                    color = MiuixTheme.colorScheme.error,
+                                )
+                            }
                             FlowRow(
                                 modifier = Modifier.padding(top = 16.dp),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
                                 LiquidButton(
-                                    onClick = { urlOpener.open(accountRepository.officialLoginUrl) },
+                                    onClick = {
+                                        cookieImporting = true
+                                        accountRepository.importCookies(cookieInput).fold(
+                                            onSuccess = {
+                                                cookieInput = ""
+                                                cookieError = null
+                                            },
+                                            onFailure = { cookieError = it.message ?: "Cookie 导入失败" },
+                                        )
+                                        cookieImporting = false
+                                    },
                                     backdrop = backdrop,
                                     tint = MiuixTheme.colorScheme.primary.copy(alpha = 0.18f),
                                 ) {
-                                    Text("登录账号")
+                                    Text(if (cookieImporting) "导入中" else "导入 Cookie")
                                 }
                                 LiquidButton(
-                                    onClick = { urlOpener.open(accountRepository.officialRegisterUrl) },
+                                    onClick = { accountRepository.refreshSession() },
                                     backdrop = backdrop,
                                 ) {
-                                    Text("注册或验证")
+                                    Text("验证会话")
                                 }
                             }
                         }

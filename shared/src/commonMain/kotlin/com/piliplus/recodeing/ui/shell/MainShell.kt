@@ -27,6 +27,7 @@ import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.lens
 import com.kyant.backdrop.effects.vibrancy
 import com.piliplus.recodeing.core.auth.AccountRepository
+import com.piliplus.recodeing.core.auth.rememberAccountRepository
 import com.piliplus.recodeing.core.design.PiliGlassDefaults
 import com.piliplus.recodeing.ui.dynamics.DynamicsScreen
 import com.piliplus.recodeing.ui.home.HomeScreen
@@ -34,6 +35,7 @@ import com.piliplus.recodeing.ui.profile.ProfileScreen
 import com.piliplus.recodeing.ui.settings.SettingsPage
 import com.piliplus.recodeing.ui.settings.SettingsStateHolder
 import com.piliplus.recodeing.ui.settings.rememberSettingsRepository
+import com.piliplus.recodeing.ui.video.VideoDetailScreen
 import top.yukonga.miuix.kmp.basic.FloatingNavigationBar
 import top.yukonga.miuix.kmp.basic.FloatingNavigationBarItem
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
@@ -51,9 +53,10 @@ private enum class WindowNavigationMode { CompactBottomBar, SideRail }
 
 @Composable
 fun MainShell(
-    accountRepository: AccountRepository = remember { AccountRepository() },
+    accountRepository: AccountRepository = rememberAccountRepository(),
 ) {
     var current by remember { mutableStateOf<AppDestination>(AppDestination.Home) }
+    var selectedVideoId by remember { mutableStateOf<String?>(null) }
     val settingsRepository = rememberSettingsRepository()
     val settingsStateHolder = remember(settingsRepository) { SettingsStateHolder(settingsRepository) }
 
@@ -71,6 +74,9 @@ fun MainShell(
             navigationMode = navigationMode,
             current = current,
             onDestinationSelected = { current = it },
+            selectedVideoId = selectedVideoId,
+            onVideoSelected = { selectedVideoId = it },
+            onVideoBack = { selectedVideoId = null },
             accountRepository = accountRepository,
             settingsStateHolder = settingsStateHolder,
             glassEnabled = settings.glassEnabled,
@@ -97,6 +103,9 @@ private fun ShellWithBackdrop(
     navigationMode: WindowNavigationMode,
     current: AppDestination,
     onDestinationSelected: (AppDestination) -> Unit,
+    selectedVideoId: String?,
+    onVideoSelected: (String) -> Unit,
+    onVideoBack: () -> Unit,
     accountRepository: AccountRepository,
     settingsStateHolder: SettingsStateHolder,
     glassEnabled: Boolean,
@@ -125,6 +134,9 @@ private fun ShellWithBackdrop(
                 accountRepository = accountRepository,
                 settingsStateHolder = settingsStateHolder,
                 backdrop = backdrop,
+                selectedVideoId = selectedVideoId,
+                onVideoSelected = onVideoSelected,
+                onVideoBack = onVideoBack,
                 glassEnabled = glassEnabled,
                 floatingBottomBar = floatingBottomBar,
             )
@@ -132,6 +144,9 @@ private fun ShellWithBackdrop(
             WindowNavigationMode.SideRail -> RailShell(
                 current = current,
                 onDestinationSelected = onDestinationSelected,
+                selectedVideoId = selectedVideoId,
+                onVideoSelected = onVideoSelected,
+                onVideoBack = onVideoBack,
                 accountRepository = accountRepository,
                 settingsStateHolder = settingsStateHolder,
                 backdrop = backdrop,
@@ -144,6 +159,9 @@ private fun ShellWithBackdrop(
 private fun CompactShell(
     current: AppDestination,
     onDestinationSelected: (AppDestination) -> Unit,
+    selectedVideoId: String?,
+    onVideoSelected: (String) -> Unit,
+    onVideoBack: () -> Unit,
     accountRepository: AccountRepository,
     settingsStateHolder: SettingsStateHolder,
     backdrop: Backdrop,
@@ -196,7 +214,15 @@ private fun CompactShell(
                 .padding(top = paddingValues.calculateTopPadding())
                 .padding(bottom = paddingValues.calculateBottomPadding()),
         ) {
-            CurrentDestination(current, accountRepository, settingsStateHolder, backdrop)
+            CurrentDestination(
+                current = current,
+                selectedVideoId = selectedVideoId,
+                onVideoSelected = onVideoSelected,
+                onVideoBack = onVideoBack,
+                accountRepository = accountRepository,
+                settingsStateHolder = settingsStateHolder,
+                backdrop = backdrop,
+            )
         }
     }
 }
@@ -205,6 +231,9 @@ private fun CompactShell(
 private fun RailShell(
     current: AppDestination,
     onDestinationSelected: (AppDestination) -> Unit,
+    selectedVideoId: String?,
+    onVideoSelected: (String) -> Unit,
+    onVideoBack: () -> Unit,
     accountRepository: AccountRepository,
     settingsStateHolder: SettingsStateHolder,
     backdrop: Backdrop,
@@ -236,7 +265,15 @@ private fun RailShell(
                 }
             }
             Box(Modifier.fillMaxSize()) {
-                CurrentDestination(current, accountRepository, settingsStateHolder, backdrop)
+                CurrentDestination(
+                current = current,
+                selectedVideoId = selectedVideoId,
+                onVideoSelected = onVideoSelected,
+                onVideoBack = onVideoBack,
+                accountRepository = accountRepository,
+                settingsStateHolder = settingsStateHolder,
+                backdrop = backdrop,
+            )
             }
         }
     }
@@ -262,12 +299,27 @@ private fun ShellTopBar(
 @Composable
 private fun CurrentDestination(
     current: AppDestination,
+    selectedVideoId: String?,
+    onVideoSelected: (String) -> Unit,
+    onVideoBack: () -> Unit,
     accountRepository: AccountRepository,
     settingsStateHolder: SettingsStateHolder,
     backdrop: Backdrop,
 ) {
+    if (selectedVideoId != null) {
+        VideoDetailScreen(
+            bvid = selectedVideoId,
+            onBack = onVideoBack,
+            onPlay = { },
+            onVideoSelected = onVideoSelected,
+        )
+        return
+    }
     when (current) {
-        AppDestination.Home -> HomeScreen(backdrop = backdrop)
+        AppDestination.Home -> HomeScreen(
+            backdrop = backdrop,
+            onVideoSelected = onVideoSelected,
+        )
         AppDestination.Dynamics -> DynamicsScreen()
         AppDestination.Profile -> ProfileScreen(accountRepository, backdrop)
         AppDestination.Settings -> SettingsPage(backdrop, settingsStateHolder)
