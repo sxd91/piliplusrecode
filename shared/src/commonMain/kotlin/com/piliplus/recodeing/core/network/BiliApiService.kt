@@ -5,6 +5,7 @@ import com.piliplus.recodeing.core.model.BiliResponse
 import com.piliplus.recodeing.core.model.CommentData
 import com.piliplus.recodeing.core.model.CommentSort
 import com.piliplus.recodeing.core.model.DynamicFeedData
+import com.piliplus.recodeing.core.model.FavoriteFolderList
 import com.piliplus.recodeing.core.model.VideoRelation
 import com.piliplus.recodeing.core.model.NavUserInfo
 import com.piliplus.recodeing.core.model.PopularFeedData
@@ -215,6 +216,50 @@ class BiliApiService(
             parameter("pn", page)
             parameter("ps", pageSize)
         }.body()
+    }
+
+    suspend fun favoriteFolders(mid: Long, aid: Long): BiliResponse<FavoriteFolderList> {
+        return client.get(BiliApiConstants.FAVORITE_FOLDERS) {
+            parameter("up_mid", mid)
+            parameter("type", 2)
+            parameter("rid", aid)
+            parameter("web_location", "333.1387")
+        }.body()
+    }
+
+    suspend fun updateFavoriteFolders(
+        aid: Long,
+        addFolderIds: Set<Long>,
+        removeFolderIds: Set<Long>,
+        csrf: String,
+    ): BiliResponse<kotlinx.serialization.json.JsonElement> {
+        return client.submitForm(
+            url = BiliApiConstants.FAVORITE_RESOURCE_DEAL,
+            formParameters = Parameters.build {
+                append("rid", aid.toString())
+                append("type", "2")
+                append("add_media_ids", addFolderIds.sorted().joinToString(","))
+                append("del_media_ids", removeFolderIds.sorted().joinToString(","))
+                append("csrf", csrf)
+            },
+        ).body()
+    }
+
+    suspend fun createFavoriteFolder(
+        title: String,
+        introduction: String,
+        isPrivate: Boolean,
+        csrf: String,
+    ): BiliResponse<kotlinx.serialization.json.JsonElement> {
+        return client.submitForm(
+            url = BiliApiConstants.FAVORITE_FOLDER_ADD,
+            formParameters = Parameters.build {
+                append("title", title)
+                append("intro", introduction)
+                append("privacy", if (isPrivate) "1" else "0")
+                append("csrf", csrf)
+            },
+        ).body()
     }
 
     suspend fun relatedVideos(bvid: String): BiliResponse<List<RecommendItem>> {

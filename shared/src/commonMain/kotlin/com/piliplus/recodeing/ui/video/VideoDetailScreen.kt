@@ -41,12 +41,14 @@ import com.piliplus.recodeing.core.design.BiliAsyncImage
 import com.piliplus.recodeing.core.design.GlassBackButton
 import com.piliplus.recodeing.core.design.GlassSurface
 import com.piliplus.recodeing.core.design.LiquidButton
+import com.piliplus.recodeing.core.model.FavoriteFolder
 import com.piliplus.recodeing.core.model.RecommendItem
 import com.piliplus.recodeing.core.model.VideoDetail
 import com.piliplus.recodeing.core.model.VideoPlayUrl
 import com.piliplus.recodeing.core.model.VideoRelation
 import com.piliplus.recodeing.core.network.BiliApiService
 import com.piliplus.recodeing.core.repository.CommentRepository
+import com.piliplus.recodeing.core.repository.FavoriteRepository
 import com.piliplus.recodeing.core.repository.VideoRepository
 import com.piliplus.recodeing.ui.settings.SettingsUiState
 import kotlinx.coroutines.Job
@@ -60,7 +62,10 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.TabRow
+import top.yukonga.miuix.kmp.basic.InputField
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.overlay.OverlayDialog
+import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -85,6 +90,7 @@ fun VideoDetailScreen(
                 bvid = bvid,
                 repository = VideoRepository(service = service),
                 commentRepository = CommentRepository(service = service),
+                favoriteRepository = FavoriteRepository(service = service),
                 cdnEndpoint = settings.selectedCdnHost,
                 rewriteAudioCdn = !settings.audioIgnoreCdn,
             )
@@ -108,6 +114,7 @@ fun VideoDetailScreen(
     val csrf = remember(authState, accountRepository) {
         accountRepository.storedCookies().firstOrNull { it.name == "bili_jct" }?.value.orEmpty()
     }
+    val currentMid = (authState as? com.piliplus.recodeing.core.auth.AuthState.LoggedIn)?.mid
     VideoDetailContent(
         state = state,
         activePlayUrl = activePlayUrl,
@@ -131,6 +138,7 @@ fun VideoDetailScreen(
         csrf = csrf,
         onLike = { viewModel.toggleLike(csrf) },
         onCoin = { viewModel.coin(csrf) },
+        onFavorite = { currentMid?.let { viewModel.openFavoritePicker(it) } },
         onRetry = viewModel::reload,
     )
 }
@@ -154,6 +162,7 @@ private fun VideoDetailContent(
     csrf: String,
     onLike: () -> Unit,
     onCoin: () -> Unit,
+    onFavorite: () -> Unit,
     onRetry: () -> Unit,
 ) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
@@ -210,6 +219,7 @@ private fun VideoDetailContent(
                         onAuthorSelected = onAuthorSelected,
                         onLike = onLike,
                         onCoin = onCoin,
+                        onFavorite = onFavorite,
                     )
                 }
                 if (detail.pages.size > 1) {
@@ -268,6 +278,15 @@ private fun VideoDetailContent(
             }
         }
     }
+    FavoriteFolderDialog(
+        state = state,
+        csrf = csrf,
+        backdrop = backdrop,
+        onDismiss = viewModel::closeFavoritePicker,
+        onToggle = viewModel::toggleFavoriteFolder,
+        onSave = { viewModel.saveFavoriteFolders(csrf) },
+        onCreate = { title, intro, isPrivate -> viewModel.createFavoriteFolder(title, intro, isPrivate, csrf) },
+    )
 }
 
 @Composable
@@ -283,6 +302,7 @@ private fun DetailHeader(
     onAuthorSelected: (Long) -> Unit,
     onLike: () -> Unit,
     onCoin: () -> Unit,
+    onFavorite: () -> Unit,
 ) {
     GlassSurface(
         backdrop = backdrop,
@@ -347,8 +367,13 @@ private fun DetailHeader(
             ) {
                 Text(if ((relation?.coin ?: 0) > 0) "已投 ${relation?.coin} 币" else "投币")
             }
-            LiquidButton(onClick = { }, backdrop = backdrop, enabled = false) {
-                Text(if (relation?.favorite == true) "已收藏" else "收藏夹接入中")
+            LiquidButton(
+                onClick = onFavorite,
+                backdrop = backdrop,
+                enabled = isLoggedIn && relation != null && !actionInProgress,
+                tint = if (relation?.favorite == true) MiuixTheme.colorScheme.primary.copy(alpha = 0.18f) else Color.Unspecified,
+            ) {
+                Text(if (relation?.favorite == true) "已收藏" else "收藏")
             }
         }
         AnimatedVisibility(visible = actionMessage != null, enter = fadeIn(), exit = fadeOut()) {
@@ -364,6 +389,107 @@ private fun DetailHeader(
                 modifier = Modifier.padding(top = 8.dp),
                 color = Color.Unspecified,
             )
+        }
+    }
+}
+
+@Composable
+private fun FavoriteFolderDialog(
+    state: VideoDetailUiState,
+    csrf: String,
+    backdrop: Backdrop,
+    onDismiss: () -> Unit,
+    onToggle: (Long) -> Unit,
+    onSave: () -> Unit,
+    onCreate: (String, String, Boolean) -> Unit,
+) {
+    var showCreate by remember { mutableStateOf(false) }
+    var title by remember { mutableStateOf("") }
+    var introduction by remember { mutableStateOf("") }
+    var privateFolder by remember { mutableStateOf(false) }
+    LaunchedEffect(state.favoritePickerVisible) {
+        if (!state.favoritePickerVisible) {
+            showCreate = false
+            title = ""
+            introduction = ""
+            privateFolder = false
+        }
+    }
+    OverlayDialog(
+        show = state.favoritePickerVisible,
+        modifier = Modifier.widthIn(max = 560.dp),
+        title = "添加到收藏夹",
+        summary = "已选择 ${state.favoriteSelectedFolderIds.size} 个收藏夹",
+        onDismissRequest = if (state.favoriteFoldersSaving) null else onDismiss,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            when {
+                state.favoriteFoldersLoading -> CircularProgressIndicator()
+                state.favoriteFolders.isEmpty() -> Text("暂无收藏夹，可先创建一个收藏夹。")
+                else -> state.favoriteFolders.forEach { folder ->
+                    SwitchPreference(
+                        title = folder.title.ifBlank { "未命名收藏夹" },
+                        summary = "${folder.mediaCount} 个内容",
+                        checked = folder.mediaId in state.favoriteSelectedFolderIds,
+                        onCheckedChange = { onToggle(folder.mediaId) },
+                    )
+                }
+            }
+            if (showCreate) {
+                InputField(
+                    query = title,
+                    onQueryChange = { title = it },
+                    onSearch = { },
+                    expanded = false,
+                    onExpandedChange = { },
+                    label = "收藏夹名称",
+                    enabled = !state.favoriteFoldersSaving,
+                )
+                InputField(
+                    query = introduction,
+                    onQueryChange = { introduction = it },
+                    onSearch = { },
+                    expanded = false,
+                    onExpandedChange = { },
+                    label = "简介（可选）",
+                    enabled = !state.favoriteFoldersSaving,
+                )
+                SwitchPreference(
+                    title = "私密收藏夹",
+                    checked = privateFolder,
+                    onCheckedChange = { privateFolder = it },
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                LiquidButton(
+                    onClick = {
+                        if (showCreate) {
+                            onCreate(title, introduction, privateFolder)
+                            title = ""
+                            introduction = ""
+                            privateFolder = false
+                            showCreate = false
+                        } else {
+                            showCreate = true
+                        }
+                    },
+                    backdrop = backdrop,
+                    enabled = csrf.isNotBlank() && !state.favoriteFoldersSaving && (!showCreate || title.isNotBlank()),
+                ) { Text(if (showCreate) "确认创建" else "新建") }
+                LiquidButton(onClick = onDismiss, backdrop = backdrop, enabled = !state.favoriteFoldersSaving) {
+                    Text("取消")
+                }
+                LiquidButton(
+                    onClick = onSave,
+                    backdrop = backdrop,
+                    enabled = csrf.isNotBlank() && !state.favoriteFoldersLoading && !state.favoriteFoldersSaving,
+                    tint = MiuixTheme.colorScheme.primary.copy(alpha = 0.18f),
+                ) { Text(if (state.favoriteFoldersSaving) "保存中" else "保存") }
+            }
         }
     }
 }
@@ -389,6 +515,13 @@ data class VideoDetailUiState(
     val selectedCid: Long = 0,
     val actionInProgress: Boolean = false,
     val actionMessage: String? = null,
+    val favoritePickerVisible: Boolean = false,
+    val favoriteFolders: List<FavoriteFolder> = emptyList(),
+    val favoriteFoldersLoading: Boolean = false,
+    val favoriteFoldersSaving: Boolean = false,
+    val favoriteSelectedFolderIds: Set<Long> = emptySet(),
+    val favoriteSavedFolderIds: Set<Long> = emptySet(),
+    val favoriteMid: Long? = null,
     val error: String? = null,
 )
 
@@ -396,6 +529,7 @@ class VideoDetailViewModel(
     private val bvid: String,
     private val repository: VideoRepository = VideoRepository(),
     val commentRepository: CommentRepository = CommentRepository(BiliApiService()),
+    private val favoriteRepository: FavoriteRepository = FavoriteRepository(BiliApiService()),
     private val cdnEndpoint: String = "auto",
     private val rewriteAudioCdn: Boolean = true,
 ) : ViewModel() {
@@ -405,6 +539,8 @@ class VideoDetailViewModel(
     private var relationJob: Job? = null
     private var relatedJob: Job? = null
     private var playUrlJob: Job? = null
+    private var favoriteLoadJob: Job? = null
+    private var favoriteMutationJob: Job? = null
 
     init {
         load()
@@ -457,6 +593,160 @@ class VideoDetailViewModel(
                 loadRelation(detail.aid)
             },
         )
+    }
+
+    fun openFavoritePicker(mid: Long) {
+        val aid = _uiState.value.detail?.aid ?: return
+        favoriteLoadJob?.cancel()
+        _uiState.update {
+            it.copy(
+                favoritePickerVisible = true,
+                favoriteFolders = emptyList(),
+                favoriteFoldersLoading = true,
+                favoriteSelectedFolderIds = emptySet(),
+                favoriteSavedFolderIds = emptySet(),
+                favoriteMid = mid,
+                actionMessage = null,
+            )
+        }
+        favoriteLoadJob = viewModelScope.launch {
+            favoriteRepository.folders(mid = mid, aid = aid).fold(
+                onSuccess = { folders ->
+                    val selected = folders.filter { it.favoriteState == 1 }.map(FavoriteFolder::mediaId).toSet()
+                    _uiState.update {
+                        it.copy(
+                            favoriteFolders = folders,
+                            favoriteFoldersLoading = false,
+                            favoriteSelectedFolderIds = selected,
+                            favoriteSavedFolderIds = selected,
+                        )
+                    }
+                },
+                onFailure = { error ->
+                    _uiState.update {
+                        it.copy(
+                            favoriteFoldersLoading = false,
+                            actionMessage = error.message ?: "收藏夹加载失败",
+                        )
+                    }
+                },
+            )
+        }
+    }
+
+    fun closeFavoritePicker() {
+        if (_uiState.value.favoriteFoldersSaving) return
+        favoriteLoadJob?.cancel()
+        _uiState.update {
+            it.copy(
+                favoritePickerVisible = false,
+                favoriteFoldersSaving = false,
+                favoriteSelectedFolderIds = it.favoriteSavedFolderIds,
+            )
+        }
+    }
+
+    fun toggleFavoriteFolder(mediaId: Long) {
+        if (mediaId <= 0 || _uiState.value.favoriteFoldersSaving) return
+        _uiState.update {
+            val selected = if (mediaId in it.favoriteSelectedFolderIds) {
+                it.favoriteSelectedFolderIds - mediaId
+            } else {
+                it.favoriteSelectedFolderIds + mediaId
+            }
+            it.copy(favoriteSelectedFolderIds = selected, actionMessage = null)
+        }
+    }
+
+    fun saveFavoriteFolders(csrf: String) {
+        val state = _uiState.value
+        val aid = state.detail?.aid ?: return
+        if (state.favoriteFoldersSaving) return
+        favoriteMutationJob?.cancel()
+        favoriteMutationJob = viewModelScope.launch {
+            _uiState.update { it.copy(favoriteFoldersSaving = true, actionMessage = null) }
+            favoriteRepository.update(
+                aid = aid,
+                originalFolderIds = state.favoriteSavedFolderIds,
+                selectedFolderIds = state.favoriteSelectedFolderIds,
+                csrf = csrf,
+            ).fold(
+                onSuccess = {
+                    _uiState.update {
+                        it.copy(
+                            favoritePickerVisible = false,
+                            favoriteFoldersSaving = false,
+                            favoriteSavedFolderIds = it.favoriteSelectedFolderIds,
+                            favoriteFolders = it.favoriteFolders.map { folder ->
+                                folder.copy(favoriteState = if (folder.mediaId in it.favoriteSelectedFolderIds) 1 else 0)
+                            },
+                            relation = (it.relation ?: VideoRelation()).copy(
+                                favorite = it.favoriteSelectedFolderIds.isNotEmpty(),
+                            ),
+                            actionMessage = "收藏夹更新成功",
+                        )
+                    }
+                },
+                onFailure = { error ->
+                    _uiState.update {
+                        it.copy(
+                            favoriteFoldersSaving = false,
+                            actionMessage = error.message ?: "收藏夹更新失败",
+                        )
+                    }
+                },
+            )
+        }
+    }
+
+    fun createFavoriteFolder(title: String, intro: String, isPrivate: Boolean, csrf: String) {
+        val state = _uiState.value
+        val mid = state.favoriteMid ?: return
+        val aid = state.detail?.aid ?: return
+        if (state.favoriteFoldersSaving) return
+        favoriteMutationJob?.cancel()
+        favoriteMutationJob = viewModelScope.launch {
+            _uiState.update { it.copy(favoriteFoldersSaving = true, actionMessage = null) }
+            favoriteRepository.create(title, intro, isPrivate, csrf).fold(
+                onSuccess = {
+                    favoriteRepository.folders(mid = mid, aid = aid).fold(
+                        onSuccess = { folders ->
+                            val serverSelected = folders.filter { it.favoriteState == 1 }
+                                .map(FavoriteFolder::mediaId)
+                                .toSet()
+                            _uiState.update {
+                                val availableIds = folders.map(FavoriteFolder::mediaId).toSet()
+                                val retained = it.favoriteSelectedFolderIds.intersect(availableIds)
+                                val newFolderIds = availableIds - it.favoriteFolders.map(FavoriteFolder::mediaId).toSet()
+                                it.copy(
+                                    favoriteFolders = folders,
+                                    favoriteFoldersSaving = false,
+                                    favoriteSelectedFolderIds = retained + newFolderIds,
+                                    favoriteSavedFolderIds = serverSelected,
+                                    actionMessage = "收藏夹创建成功",
+                                )
+                            }
+                        },
+                        onFailure = { error ->
+                            _uiState.update {
+                                it.copy(
+                                    favoriteFoldersSaving = false,
+                                    actionMessage = error.message ?: "收藏夹刷新失败",
+                                )
+                            }
+                        },
+                    )
+                },
+                onFailure = { error ->
+                    _uiState.update {
+                        it.copy(
+                            favoriteFoldersSaving = false,
+                            actionMessage = error.message ?: "收藏夹创建失败",
+                        )
+                    }
+                },
+            )
+        }
     }
 
     private fun runAction(

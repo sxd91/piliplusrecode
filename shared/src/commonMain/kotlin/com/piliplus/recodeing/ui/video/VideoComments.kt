@@ -158,6 +158,42 @@ class VideoCommentsViewModel(
         }
     }
 
+    fun hate(comment: CommentItem, csrf: String) {
+        if (comment.rpid in _state.value.reactingCommentIds) return
+        val targetHate = comment.action != 2
+        viewModelScope.launch {
+            _state.update { it.copy(reactingCommentIds = it.reactingCommentIds + comment.rpid) }
+            repository.hate(aid, comment.rpid, targetHate, csrf).fold(
+                onSuccess = {
+                    updateComment(comment.rpid) { current ->
+                        current.copy(
+                            action = if (targetHate) 2 else 0,
+                            like = if (targetHate && current.action == 1) {
+                                (current.like - 1).coerceAtLeast(0)
+                            } else {
+                                current.like
+                            },
+                        )
+                    }
+                    _state.update {
+                        it.copy(
+                            reactingCommentIds = it.reactingCommentIds - comment.rpid,
+                            actionMessage = if (targetHate) "已点踩评论" else "已取消点踩",
+                        )
+                    }
+                },
+                onFailure = { error ->
+                    _state.update {
+                        it.copy(
+                            reactingCommentIds = it.reactingCommentIds - comment.rpid,
+                            actionMessage = error.message ?: "评论点踩失败",
+                        )
+                    }
+                },
+            )
+        }
+    }
+
     fun submit(csrf: String, parent: CommentItem? = null) {
         val state = _state.value
         if (state.submitting || state.composerText.isBlank()) return
@@ -284,6 +320,7 @@ fun LazyListScope.videoComments(
             onComposerChange = viewModel::updateComposer,
             onSubmit = { viewModel.submit(csrf) },
             onLike = { viewModel.like(it, csrf) },
+            onHate = { viewModel.hate(it, csrf) },
         )
     }
 }
@@ -301,6 +338,7 @@ private fun VideoCommentsContent(
     onComposerChange: (String) -> Unit,
     onSubmit: () -> Unit,
     onLike: (CommentItem) -> Unit,
+    onHate: (CommentItem) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         if (state.selectedRoot == null) {
@@ -318,6 +356,7 @@ private fun VideoCommentsContent(
                     backdrop = backdrop,
                     reacting = comment.rpid in state.reactingCommentIds,
                     onLike = onLike,
+                    onHate = onHate,
                     onOpenThread = onOpenThread,
                 )
             }
@@ -331,6 +370,7 @@ private fun VideoCommentsContent(
                 backdrop = backdrop,
                 reacting = state.selectedRoot.rpid in state.reactingCommentIds,
                 onLike = onLike,
+                onHate = onHate,
                 onOpenThread = null,
             )
             CommentComposer(state, csrf, backdrop, onComposerChange, onSubmit)
@@ -341,6 +381,7 @@ private fun VideoCommentsContent(
                     backdrop = backdrop,
                     reacting = reply.rpid in state.reactingCommentIds,
                     onLike = onLike,
+                    onHate = onHate,
                     onOpenThread = null,
                 )
             }
@@ -389,6 +430,7 @@ private fun CommentCard(
     backdrop: Backdrop,
     reacting: Boolean,
     onLike: (CommentItem) -> Unit,
+    onHate: (CommentItem) -> Unit,
     onOpenThread: ((CommentItem) -> Unit)?,
 ) {
     Card(
@@ -437,6 +479,13 @@ private fun CommentCard(
                 enabled = csrf.isNotBlank() && !reacting,
                 tint = if (comment.action == 1) MiuixTheme.colorScheme.primary.copy(alpha = 0.18f) else androidx.compose.ui.graphics.Color.Unspecified,
             ) { Text("赞 ${comment.like}") }
+            LiquidButton(
+                onClick = { onHate(comment) },
+                backdrop = backdrop,
+                compact = true,
+                enabled = csrf.isNotBlank() && !reacting,
+                tint = if (comment.action == 2) MiuixTheme.colorScheme.error.copy(alpha = 0.16f) else androidx.compose.ui.graphics.Color.Unspecified,
+            ) { Text(if (comment.action == 2) "已踩" else "踩") }
             val replies = comment.rcount.coerceAtLeast(comment.count)
             if (onOpenThread != null && replies > 0) {
                 LiquidButton(onClick = { onOpenThread(comment) }, backdrop = backdrop, compact = true) {

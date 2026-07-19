@@ -13,8 +13,12 @@ import java.util.Locale
 object DebugLog {
     private const val Tag = "reliqliquid"
     private lateinit var logFile: File
+    private var installed = false
 
+    @Synchronized
     fun install(context: Context) {
+        if (installed) return
+        installed = true
         val directory = File(context.filesDir, "logs").apply { mkdirs() }
         logFile = File(directory, "reliqliquid-debug.log")
         trimIfNeeded()
