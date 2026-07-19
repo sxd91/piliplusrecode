@@ -13,9 +13,13 @@ import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 private const val PreferencesName = "liquidreode_session"
 private const val CookieKey = "cookies"
+private const val AccountsKey = "accounts"
+private const val CurrentAccountKey = "current_account"
 private const val KeyStoreType = "AndroidKeyStore"
 private const val KeyAlias = "liquidreode_session_key"
 private const val Transformation = "AES/GCM/NoPadding"
@@ -38,8 +42,26 @@ actual class SessionStore internal constructor(
         preferences.edit().putString(CookieKey, encrypt(value)).apply()
     }
 
+    actual fun loadAccounts(): List<StoredAccount> {
+        val encoded = preferences.getString(AccountsKey, null) ?: return emptyList()
+        return runCatching { Json.decodeFromString<List<StoredAccount>>(decrypt(encoded)) }
+            .getOrDefault(emptyList())
+    }
+
+    actual fun saveAccounts(accounts: List<StoredAccount>) {
+        preferences.edit().putString(AccountsKey, encrypt(Json.encodeToString(accounts))).apply()
+    }
+
+    actual fun currentAccountId(): String? = preferences.getString(CurrentAccountKey, null)
+
+    actual fun setCurrentAccountId(id: String?) {
+        preferences.edit().apply {
+            if (id == null) remove(CurrentAccountKey) else putString(CurrentAccountKey, id)
+        }.apply()
+    }
+
     actual fun clear() {
-        preferences.edit().remove(CookieKey).apply()
+        preferences.edit().remove(CookieKey).remove(CurrentAccountKey).apply()
     }
 
     private val preferences get() = context.getSharedPreferences(PreferencesName, Context.MODE_PRIVATE)

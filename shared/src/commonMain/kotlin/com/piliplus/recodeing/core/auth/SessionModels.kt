@@ -7,15 +7,30 @@ import com.piliplus.recodeing.core.network.BiliApiService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.serialization.Serializable
 
+@Serializable
 data class SessionCookie(
     val name: String,
     val value: String,
 )
 
+@Serializable
+data class StoredAccount(
+    val id: String,
+    val name: String,
+    val mid: Long? = null,
+    val avatarUrl: String? = null,
+    val cookies: List<SessionCookie>,
+)
+
 expect class SessionStore {
     fun loadCookies(): List<SessionCookie>
     fun saveCookies(cookies: List<SessionCookie>)
+    fun loadAccounts(): List<StoredAccount>
+    fun saveAccounts(accounts: List<StoredAccount>)
+    fun currentAccountId(): String?
+    fun setCurrentAccountId(id: String?)
     fun clear()
 }
 
@@ -33,11 +48,19 @@ sealed interface AuthState {
 
 class AccountRepository(
     private val sessionStore: SessionStore,
-    private val apiService: BiliApiService = BiliApiService {
-        sessionStore.loadCookies().joinToString("; ") { "${it.name}=${it.value}" }
-    },
+    private val apiService: BiliApiService = BiliApiService(
+        cookieHeaderProvider = {
+            sessionStore.loadCookies().joinToString("; ") { "${it.name}=${it.value}" }
+        },
+    ),
 ) {
-    private val _authState = MutableStateFlow<AuthState>(AuthState.Anonymous)
+    private val _accounts = MutableStateFlow(sessionStore.loadAccounts())
+    val accounts: StateFlow<List<StoredAccount>> = _accounts.asStateFlow()
+    private val initialAccount = _accounts.value.firstOrNull { it.id == sessionStore.currentAccountId() }
+    private val _authState = MutableStateFlow<AuthState>(
+        initialAccount?.mid?.let { AuthState.LoggedIn(it, initialAccount.name, initialAccount.avatarUrl) }
+            ?: AuthState.Anonymous,
+    )
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
 
     val officialLoginUrl: String = BiliApiConstants.OFFICIAL_LOGIN_URL
@@ -53,6 +76,19 @@ class AccountRepository(
             AuthState.Anonymous
         }
         _authState.value = authState
+        if (authState is AuthState.LoggedIn) {
+            val account = StoredAccount(
+                id = authState.mid.toString(),
+                name = authState.name,
+                mid = authState.mid,
+                avatarUrl = authState.avatarUrl,
+                cookies = sessionStore.loadCookies(),
+            )
+            val updated = _accounts.value.filterNot { it.id == account.id } + account
+            _accounts.value = updated
+            sessionStore.saveAccounts(updated)
+            sessionStore.setCurrentAccountId(account.id)
+        }
         authState
     }
 
@@ -69,6 +105,22 @@ class AccountRepository(
     }
 
     fun storedCookies(): List<SessionCookie> = sessionStore.loadCookies()
+
+    fun switchAccount(id: String): Result<Unit> = runCatching {
+        val account = _accounts.value.firstOrNull { it.id == id } ?: error("账号不存在")
+        sessionStore.saveCookies(account.cookies)
+        sessionStore.setCurrentAccountId(account.id)
+        _authState.value = account.mid?.let {
+            AuthState.LoggedIn(it, account.name, account.avatarUrl)
+        } ?: AuthState.Anonymous
+    }
+
+    fun removeAccount(id: String) {
+        val updated = _accounts.value.filterNot { it.id == id }
+        _accounts.value = updated
+        sessionStore.saveAccounts(updated)
+        if (sessionStore.currentAccountId() == id) clearSession()
+    }
 
     fun clearSession() {
         sessionStore.clear()

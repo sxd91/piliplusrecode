@@ -24,6 +24,9 @@ data class HomeUiState(
     val searchDefault: String = "搜索 Bilibili",
     val searchSuggestions: List<SearchSuggestItem> = emptyList(),
     val searchResults: List<SearchResultItem> = emptyList(),
+    val searchHistory: List<String> = emptyList(),
+    val minimumDurationMinutes: Int = 0,
+    val publishedWithinDays: Int = 0,
     val error: String? = null,
 )
 
@@ -84,6 +87,9 @@ class HomeViewModel(
     fun submitSearch(query: String = _uiState.value.searchQuery) {
         val keyword = query.ifBlank { _uiState.value.searchDefault }.trim()
         if (keyword.isBlank()) return
+        _uiState.update { state ->
+            state.copy(searchHistory = (listOf(keyword) + state.searchHistory.filterNot { it == keyword }).take(10))
+        }
         viewModelScope.launch {
             _uiState.update {
                 it.copy(
@@ -105,6 +111,18 @@ class HomeViewModel(
                 },
             )
         }
+    }
+
+    fun setDurationFilter(minutes: Int) {
+        _uiState.update { it.copy(minimumDurationMinutes = minutes.coerceAtLeast(0)) }
+    }
+
+    fun setPublishedFilter(days: Int) {
+        _uiState.update { it.copy(publishedWithinDays = days.coerceAtLeast(0)) }
+    }
+
+    fun clearSearchHistory() {
+        _uiState.update { it.copy(searchHistory = emptyList()) }
     }
 
     fun refresh() {

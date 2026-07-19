@@ -16,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -23,6 +24,7 @@ import com.piliplus.recodeing.core.auth.AccountRepository
 import com.piliplus.recodeing.core.auth.AuthState
 import com.kyant.backdrop.Backdrop
 import com.piliplus.recodeing.core.design.LiquidButton
+import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.InputField
 import top.yukonga.miuix.kmp.basic.SmallTitle
@@ -35,6 +37,8 @@ fun ProfileScreen(
     backdrop: Backdrop,
 ) {
     val authState by accountRepository.authState.collectAsState()
+    val accounts by accountRepository.accounts.collectAsState()
+    val coroutineScope = rememberCoroutineScope()
     var cookieInput by remember { mutableStateOf("") }
     var cookieError by remember { mutableStateOf<String?>(null) }
     var cookieImporting by remember { mutableStateOf(false) }
@@ -74,6 +78,9 @@ fun ProfileScreen(
                                     cookieInput = it
                                     cookieError = null
                                 },
+                                onSearch = { },
+                                expanded = false,
+                                onExpandedChange = { },
                                 label = "粘贴 Cookie，如 SESSDATA=...; bili_jct=...",
                                 modifier = Modifier.padding(top = 16.dp),
                             )
@@ -107,7 +114,13 @@ fun ProfileScreen(
                                     Text(if (cookieImporting) "导入中" else "导入 Cookie")
                                 }
                                 LiquidButton(
-                                    onClick = { accountRepository.refreshSession() },
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            accountRepository.refreshSession().onFailure {
+                                                cookieError = it.message ?: "会话验证失败"
+                                            }
+                                        }
+                                    },
                                     backdrop = backdrop,
                                 ) {
                                     Text("验证会话")
@@ -140,11 +153,39 @@ fun ProfileScreen(
                     insideMargin = PaddingValues(20.dp),
                 ) {
                     Text("多账号", style = MiuixTheme.textStyles.title3)
-                    Text(
-                        "后续将在安全存储接入后支持账号隔离、切换和会话刷新。",
-                        modifier = Modifier.padding(top = 8.dp),
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    )
+                    if (accounts.isEmpty()) {
+                        Text(
+                            "登录后的账号会保存在加密会话存储中。",
+                            modifier = Modifier.padding(top = 8.dp),
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        )
+                    } else {
+                        accounts.forEach { account ->
+                            FlowRow(
+                                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                LiquidButton(
+                                    onClick = {
+                                        accountRepository.switchAccount(account.id).onFailure {
+                                            cookieError = it.message ?: "账号切换失败"
+                                        }
+                                    },
+                                    backdrop = backdrop,
+                                    tint = MiuixTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                ) {
+                                    Text(account.name)
+                                }
+                                LiquidButton(
+                                    onClick = { accountRepository.removeAccount(account.id) },
+                                    backdrop = backdrop,
+                                ) {
+                                    Text("移除")
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

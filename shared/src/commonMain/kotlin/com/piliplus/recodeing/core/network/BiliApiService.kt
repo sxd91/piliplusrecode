@@ -1,6 +1,7 @@
 package com.piliplus.recodeing.core.network
 
 import com.piliplus.recodeing.core.model.BiliResponse
+import com.piliplus.recodeing.core.model.DynamicFeedData
 import com.piliplus.recodeing.core.model.NavUserInfo
 import com.piliplus.recodeing.core.model.PopularFeedData
 import com.piliplus.recodeing.core.model.RecommendFeedData
@@ -46,6 +47,14 @@ class BiliApiService(
 
     suspend fun navUserInfo(): BiliResponse<NavUserInfo> {
         return client.get(BiliApiConstants.USER_INFO).body()
+    }
+
+    suspend fun dynamics(offset: String = ""): BiliResponse<DynamicFeedData> {
+        return client.get(BiliApiConstants.DYNAMIC_FEED) {
+            parameter("timezone_offset", -480)
+            parameter("type", "all")
+            if (offset.isNotBlank()) parameter("offset", offset)
+        }.body()
     }
 
     suspend fun searchDefault(): BiliResponse<SearchDefaultData> {

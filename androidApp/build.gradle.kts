@@ -14,7 +14,7 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.piliplus.recodeing"
+        applicationId = "com.sxd.liquidreode"
         minSdk = 23
         targetSdk = 37
         versionCode = 1

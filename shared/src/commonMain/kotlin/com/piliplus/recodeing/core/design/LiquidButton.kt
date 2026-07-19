@@ -36,6 +36,7 @@ import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.colorControls
 import com.kyant.backdrop.effects.lens
 import com.kyant.backdrop.highlight.Highlight
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -52,7 +53,7 @@ fun LiquidButton(
     backdrop: Backdrop,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    adaptiveLuminance: Boolean = true,
+    adaptiveLuminance: Boolean = false,
     tint: Color = Color.Unspecified,
     content: @Composable RowScope.() -> Unit,
 ) {
@@ -133,7 +134,7 @@ fun LiquidButton(
                     if (adaptiveLuminance) sampledLayer.record { drawBackdrop() }
                 },
                 onDrawSurface = {
-                    if (tint.isSpecified) {
+                    if (tint != Color.Unspecified) {
                         drawRect(tint, blendMode = BlendMode.Hue)
                         drawRect(tint.copy(alpha = 0.64f))
                     } else {
@@ -153,13 +154,20 @@ fun LiquidButton(
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                     val origin = down.position
+                    var pointerUpdateJob: Job? = null
                     scope.launch { pressProgress.animateTo(1f, spring(0.5f, 300f)) }
                     scope.launch { pointerOffset.snapTo(Offset.Zero) }
                     do {
                         val event = awaitPointerEvent(PointerEventPass.Initial)
                         val change = event.changes.firstOrNull { it.id == down.id }
-                        if (change != null) pointerOffset.snapTo(change.position - origin)
+                        change?.let { pointerChange ->
+                            pointerUpdateJob?.cancel()
+                            pointerUpdateJob = scope.launch {
+                                pointerOffset.snapTo(pointerChange.position - origin)
+                            }
+                        }
                     } while (change?.pressed == true)
+                    pointerUpdateJob?.cancel()
                     scope.launch { pressProgress.animateTo(0f, spring(0.5f, 300f)) }
                     scope.launch { pointerOffset.animateTo(Offset.Zero, spring(0.5f, 300f)) }
                 }

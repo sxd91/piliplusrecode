@@ -20,7 +20,7 @@ on:
         type: string
 
 permissions:
-  contents: write
+  contents: read
   actions: read
 
 concurrency:
@@ -97,20 +97,6 @@ jobs:
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Commit generated change summary on push
-        if: github.event_name == 'push'
-        shell: bash
-        run: |
-          if git diff --quiet -- .github/generated/last-detected-changes.md; then
-            echo "Generated change summary unchanged."
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/generated/last-detected-changes.md
-          git commit -m "chore: update detected change summary [skip ci]"
-          git push
-
       - name: Upload detected change summary
         uses: actions/upload-artifact@v4
         with:
@@ -121,7 +107,7 @@ jobs:
   build:
     name: Build unsigned packages
     needs: detect-changes
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request' || github.event_name == 'push'
     strategy:
       fail-fast: false
       matrix:
@@ -177,6 +163,8 @@ jobs:
     name: Publish GitHub Release
     needs: [detect-changes, build]
     if: github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

@@ -6,6 +6,10 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -40,13 +44,21 @@ fun VideoDetailScreen(
     bvid: String,
     onBack: () -> Unit,
     onPlay: (VideoPlayUrl) -> Unit,
+    onVideoSelected: (String) -> Unit,
     viewModel: VideoDetailViewModel = viewModel(key = bvid) { VideoDetailViewModel(bvid) },
 ) {
     val state by viewModel.uiState.collectAsState()
+    var activePlayUrl by remember(bvid, state.selectedCid) { mutableStateOf<VideoPlayUrl?>(null) }
     VideoDetailContent(
         state = state,
-        onBack = onBack,
-        onPlay = onPlay,
+        activePlayUrl = activePlayUrl,
+        onBack = {
+            if (activePlayUrl != null) activePlayUrl = null else onBack()
+        },
+        onPlay = {
+            activePlayUrl = it
+            onPlay(it)
+        },
         onVideoSelected = onVideoSelected,
         onSelectPage = viewModel::selectPage,
     )
@@ -55,6 +67,7 @@ fun VideoDetailScreen(
 @Composable
 private fun VideoDetailContent(
     state: VideoDetailUiState,
+    activePlayUrl: VideoPlayUrl?,
     onBack: () -> Unit,
     onPlay: (VideoPlayUrl) -> Unit,
     onVideoSelected: (String) -> Unit,
@@ -67,7 +80,18 @@ private fun VideoDetailContent(
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             item {
-                BasicComponent(title = "返回", onClick = onBack)
+                BasicComponent(
+                    title = if (activePlayUrl == null) "返回" else "关闭播放器",
+                    onClick = onBack,
+                )
+            }
+            activePlayUrl?.let { playUrl ->
+                item {
+                    PlatformVideoPlayer(
+                        playUrl = playUrl,
+                        modifier = Modifier.fillMaxWidth().height(240.dp),
+                    )
+                }
             }
             state.error?.let { errorMessage ->
                 item {

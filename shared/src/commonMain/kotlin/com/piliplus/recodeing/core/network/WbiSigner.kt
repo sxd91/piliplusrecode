@@ -47,7 +47,10 @@ class WbiSigner(
             val navResponse: BiliResponse<NavUserInfo> = client.get(BiliApiConstants.USER_INFO).body()
             val wbiImage = requireNotNull(navResponse.data?.wbiImage) { "Bilibili nav response did not include WBI keys" }
             val originalKey = extractKey(wbiImage.imageUrl) + extractKey(wbiImage.subUrl)
-            val mixinKey = MixinKeyPermutation.mapNotNull(originalKey::getOrNull).joinToString("").take(32)
+            val mixinKey = MixinKeyPermutation.asSequence()
+                .mapNotNull { index -> originalKey.getOrNull(index) }
+                .joinToString("")
+                .take(32)
             require(mixinKey.length == 32) { "Bilibili returned invalid WBI keys" }
             cachedMixinKey = mixinKey
             cacheExpiresAtSeconds = lockedNow + WbiCacheDurationSeconds

@@ -42,6 +42,7 @@ import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.NavigationRail
 import top.yukonga.miuix.kmp.basic.NavigationRailItem
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -282,7 +283,7 @@ private fun RailShell(
 @Composable
 private fun ShellTopBar(
     current: AppDestination,
-    scrollBehavior: MiuixScrollBehavior,
+    scrollBehavior: ScrollBehavior,
 ) {
     TopAppBar(
         title = current.title,
@@ -320,7 +321,11 @@ private fun CurrentDestination(
             backdrop = backdrop,
             onVideoSelected = onVideoSelected,
         )
-        AppDestination.Dynamics -> DynamicsScreen()
+        AppDestination.Dynamics -> DynamicsScreen(
+            accountRepository = accountRepository,
+            backdrop = backdrop,
+            onVideoSelected = onVideoSelected,
+        )
         AppDestination.Profile -> ProfileScreen(accountRepository, backdrop)
         AppDestination.Settings -> SettingsPage(backdrop, settingsStateHolder)
     }

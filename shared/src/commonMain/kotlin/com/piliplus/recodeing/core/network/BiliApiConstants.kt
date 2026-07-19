@@ -19,6 +19,7 @@ object BiliApiConstants {
     const val VIDEO_ONLINE_TOTAL = "/x/player/online/total"
     const val VIDEO_AI_CONCLUSION = "/x/web-interface/view/conclusion/get"
     const val VIDEO_SHOT = "/x/player/videoshot"
+    const val DYNAMIC_FEED = "/x/polymer/web-dynamic/v1/feed/all"
 
     const val OFFICIAL_LOGIN_URL = "$PASSPORT_BASE_URL/login"
     const val OFFICIAL_REGISTER_URL = "$PASSPORT_BASE_URL/register/phone.html"

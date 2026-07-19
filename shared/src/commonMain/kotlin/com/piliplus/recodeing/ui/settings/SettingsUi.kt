@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -61,7 +60,7 @@ fun SettingsPage(
                                 backdrop = backdrop,
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
-                                Column(Modifier.weight(1f)) {
+                                Column(Modifier.fillMaxWidth()) {
                                     Text(category.title)
                                     Text(category.summary)
                                 }

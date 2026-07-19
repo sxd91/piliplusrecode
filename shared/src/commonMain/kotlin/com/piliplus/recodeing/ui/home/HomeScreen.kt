@@ -8,12 +8,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.weight
 import androidx.compose.ui.graphics.Color
 import com.kyant.backdrop.Backdrop
 import com.piliplus.recodeing.core.design.LiquidButton
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Search
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -48,13 +48,26 @@ fun HomeScreen(
     viewModel: HomeViewModel = viewModel { HomeViewModel() },
 ) {
     val state by viewModel.uiState.collectAsState()
-    val urlOpener = rememberUrlOpener()
     var searchExpanded by remember { mutableStateOf(false) }
-    val feedItems = remember(state.selectedTab, state.recommendItems, state.popularItems) {
-        when (state.selectedTab) {
+    val feedItems = remember(
+        state.selectedTab,
+        state.recommendItems,
+        state.popularItems,
+        state.minimumDurationMinutes,
+        state.publishedWithinDays,
+    ) {
+        val source = when (state.selectedTab) {
             HomeTab.Recommend -> state.recommendItems
             HomeTab.Popular -> state.popularItems
             HomeTab.Search -> emptyList()
+        }
+        val nowSeconds = kotlin.time.Clock.System.now().epochSeconds
+        source.filter { item ->
+            val durationMatches = state.minimumDurationMinutes == 0 ||
+                item.duration >= state.minimumDurationMinutes * 60L
+            val publishedMatches = state.publishedWithinDays == 0 || item.pubdate == null ||
+                item.pubdate >= nowSeconds - state.publishedWithinDays * 86_400L
+            durationMatches && publishedMatches
         }
     }
 
@@ -73,6 +86,7 @@ fun HomeScreen(
                 onClick = { searchExpanded = true },
                 backdrop = backdrop,
                 modifier = Modifier.fillMaxWidth(),
+                adaptiveLuminance = true,
                 tint = MiuixTheme.colorScheme.primary.copy(alpha = 0.12f),
             ) {
                 Icon(
@@ -82,7 +96,6 @@ fun HomeScreen(
                 )
                 Text(
                     text = state.searchQuery.ifBlank { state.searchDefault.ifBlank { "搜索视频、UP 主与番剧" } },
-                    modifier = Modifier.weight(1f),
                     color = Color.Unspecified,
                 )
             }
@@ -107,16 +120,32 @@ fun HomeScreen(
                     modifier = Modifier.fillMaxWidth(),
                     insideMargin = PaddingValues(vertical = 4.dp),
                 ) {
-                    state.searchSuggestions.take(8).forEach { suggestion ->
-                        val text = suggestion.value.ifBlank { suggestion.term ?: suggestion.name.orEmpty() }
-                        if (text.isNotBlank()) {
+                    if (state.searchQuery.isBlank()) {
+                        state.searchHistory.forEach { text ->
                             BasicComponent(
                                 title = text,
+                                summary = "搜索历史",
                                 onClick = {
                                     searchExpanded = false
                                     viewModel.submitSearch(text)
                                 },
                             )
+                        }
+                        if (state.searchHistory.isNotEmpty()) {
+                            BasicComponent(title = "清空搜索历史", onClick = viewModel::clearSearchHistory)
+                        }
+                    } else {
+                        state.searchSuggestions.take(8).forEach { suggestion ->
+                            val text = suggestion.value.ifBlank { suggestion.term ?: suggestion.name.orEmpty() }
+                            if (text.isNotBlank()) {
+                                BasicComponent(
+                                    title = text,
+                                    onClick = {
+                                        searchExpanded = false
+                                        viewModel.submitSearch(text)
+                                    },
+                                )
+                            }
                         }
                     }
                 }
@@ -128,6 +157,32 @@ fun HomeScreen(
                 onTabSelected = { viewModel.selectTab(HomeTab.entries[it]) },
                 modifier = Modifier.fillMaxWidth(),
             )
+
+            if (state.selectedTab != HomeTab.Search) {
+                androidx.compose.foundation.layout.FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    listOf(0 to "全部时长", 5 to "5 分钟+", 20 to "20 分钟+").forEach { (minutes, label) ->
+                        LiquidButton(
+                            onClick = { viewModel.setDurationFilter(minutes) },
+                            backdrop = backdrop,
+                            tint = if (state.minimumDurationMinutes == minutes) {
+                                MiuixTheme.colorScheme.primary.copy(alpha = 0.16f)
+                            } else Color.Unspecified,
+                        ) { Text(label) }
+                    }
+                    listOf(0 to "全部时间", 1 to "今天", 7 to "一周内").forEach { (days, label) ->
+                        LiquidButton(
+                            onClick = { viewModel.setPublishedFilter(days) },
+                            backdrop = backdrop,
+                            tint = if (state.publishedWithinDays == days) {
+                                MiuixTheme.colorScheme.primary.copy(alpha = 0.16f)
+                            } else Color.Unspecified,
+                        ) { Text(label) }
+                    }
+                }
+            }
 
             if (state.isLoading) {
                 Box(
