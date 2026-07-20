@@ -141,6 +141,22 @@ fun VideoDetailScreen(
         onFavorite = { currentMid?.let { viewModel.openFavoritePicker(it) } },
         onRetry = viewModel::reload,
     )
+    FavoriteFolderDialog(
+        state = state,
+        csrf = csrf,
+        backdrop = backdrop,
+        onDismiss = viewModel::closeFavoritePicker,
+        onToggle = viewModel::toggleFavoriteFolder,
+        onSave = { viewModel.saveFavoriteFolders(csrf) },
+        onCreate = { title, intro, isPrivate ->
+            viewModel.createFavoriteFolder(
+                title = title,
+                intro = intro,
+                isPrivate = isPrivate,
+                csrf = csrf,
+            )
+        },
+    )
 }
 
 @Composable
@@ -278,15 +294,6 @@ private fun VideoDetailContent(
             }
         }
     }
-    FavoriteFolderDialog(
-        state = state,
-        csrf = csrf,
-        backdrop = backdrop,
-        onDismiss = viewModel::closeFavoritePicker,
-        onToggle = viewModel::toggleFavoriteFolder,
-        onSave = { viewModel.saveFavoriteFolders(csrf) },
-        onCreate = { title, intro, isPrivate -> viewModel.createFavoriteFolder(title, intro, isPrivate, csrf) },
-    )
 }
 
 @Composable

@@ -141,19 +141,22 @@ private fun ShellWithBackdrop(
 ) {
     val backgroundColor = MiuixTheme.colorScheme.background
     val backdrop = rememberLayerBackdrop(
-        onDraw = {
-            drawRect(backgroundColor)
-            drawContent()
-        },
+        onDraw = { drawRect(backgroundColor) },
     )
 
     CompositionLocalProvider(LocalLiquidGlassEnabled provides glassEnabled) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(backgroundColor)
-                .then(if (glassEnabled) Modifier.layerBackdrop(backdrop) else Modifier),
+                .background(backgroundColor),
         ) {
+            if (glassEnabled) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .layerBackdrop(backdrop),
+                )
+            }
             when (navigationMode) {
                 WindowNavigationMode.CompactBottomBar -> CompactShell(
                     current = current,
