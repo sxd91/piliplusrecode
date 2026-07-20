@@ -70,18 +70,12 @@ fun LiquidButton(
 
     LaunchedEffect(sampledLayer, useAdaptiveLuminance) {
         if (!useAdaptiveLuminance) return@LaunchedEffect
-        val pixels = IntArray(25)
         while (isActive) {
             val bitmap = runCatching { sampledLayer.toImageBitmap() }.getOrNull()
-            if (bitmap != null && bitmap.width > 0 && bitmap.height > 0) {
-                val thumbnail = bitmap.scaledTo(5, 5)
-                thumbnail.readPixels(pixels)
-                val average = pixels.sumOf { argb ->
-                    val red = (argb shr 16 and 0xFF) / 255.0
-                    val green = (argb shr 8 and 0xFF) / 255.0
-                    val blue = (argb and 0xFF) / 255.0
-                    0.2126 * red + 0.7152 * green + 0.0722 * blue
-                }.toFloat() / pixels.size
+            val average = bitmap?.let { image ->
+                runCatching { sampleImageLuminance(image) }.getOrNull()
+            }
+            if (average != null) {
                 if (abs(average - luminance.targetValue) >= 0.03f) {
                     luminance.animateTo(average, spring(stiffness = 120f))
                 }
@@ -201,18 +195,4 @@ fun LiquidButton(
             content()
         }
     }
-}
-
-private fun androidx.compose.ui.graphics.ImageBitmap.scaledTo(width: Int, height: Int): androidx.compose.ui.graphics.ImageBitmap {
-    val target = androidx.compose.ui.graphics.ImageBitmap(width, height)
-    val canvas = androidx.compose.ui.graphics.Canvas(target)
-    canvas.drawImageRect(
-        image = this,
-        srcOffset = androidx.compose.ui.unit.IntOffset.Zero,
-        srcSize = androidx.compose.ui.unit.IntSize(this.width, this.height),
-        dstOffset = androidx.compose.ui.unit.IntOffset.Zero,
-        dstSize = androidx.compose.ui.unit.IntSize(width, height),
-        paint = androidx.compose.ui.graphics.Paint(),
-    )
-    return target
 }
